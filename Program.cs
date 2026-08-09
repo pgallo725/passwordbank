@@ -45,6 +45,25 @@ namespace passwordbank
         }
 
 
+        static (bool, string?) EmailAddressValidator(string emailAddress)
+        {
+            // Consider an email address correct if it can be used to construct a valid MailAddress object
+            if (System.Net.Mail.MailAddress.TryCreate(emailAddress, out var _))
+                return (true, string.Empty);
+            else return (false, "The input does not match the format of a valid email address.");
+        }
+
+        static (bool, string?) AccountNameValidator(string accountName)
+        {
+            // Check if the account already exists in the database
+            if (database is null)
+                return (false, "Cannot access the database for checking the username.");
+            else if (database.Contains(accountName))
+                return (false, "An account with the same name already exists in the database.");
+            else return (true, string.Empty);
+        }
+
+
         /// <summary>
         /// An open connection to the credentials database, this is realized the first time <br/>
         ///  that it's required and then cached for the lifetime of the program.
@@ -64,18 +83,19 @@ namespace passwordbank
         static void Main(string[] args)
         {
             // Application title
+            Console.Title = "PasswordBank v0.1";
             AnsiConsole.MarkupLine("""
                 [green3]
-                       _____                                           _  ____                 _    
-                      |  __ \                                         | ||  _ \               | |   
-                      | |__) |__ _  ___  ___ __      __ ___   _ __  __| || |_) |  __ _  _ __  | | __
-                      |  ___// _` |/ __|/ __|\ \ /\ / // _ \ | '__|/ _` ||  _ <  / _` || '_ \ | |/ /
-                      | |   | (_| |\__ \\__ \ \ V  V /| (_) || |  | (_| || |_) || (_| || | | ||   < 
-                      |_|    \__,_||___/|___/  \_/\_/  \___/ |_|   \__,_||____/  \__,_||_| |_||_|\_\
+                      _____                                           _  ____                 _    
+                     |  __ \                                         | ||  _ \               | |   
+                     | |__) |__ _  ___  ___ __      __ ___   _ __  __| || |_) |  __ _  _ __  | | __
+                     |  ___// _` |/ __|/ __|\ \ /\ / // _ \ | '__|/ _` ||  _ <  / _` || '_ \ | |/ /
+                     | |   | (_| |\__ \\__ \ \ V  V /| (_) || |  | (_| || |_) || (_| || | | ||   < 
+                     |_|    \__,_||___/|___/  \_/\_/  \___/ |_|   \__,_||____/  \__,_||_| |_||_|\_\
                 [/][darkorange3_1]
-                    Version 0.1                                                      developed by JackaL
+                   Version 0.1                                                      developed by JackaL
                 [/][green3]
-                  ________________________________________________________________________________________
+                 ________________________________________________________________________________________
                 [/]
                 """);
 
@@ -204,6 +224,45 @@ namespace passwordbank
         {
             AnsiConsole.Markup("[grey]Press[/] [gray70 slowblink]Enter[/] [grey]to continue...[/]");
             ConsoleHelper.WaitForEnterKey();
+        }
+
+
+        private static string ValidatedTextPrompt(TextPrompt<string> prompt, Func<string, (bool, string?)> validator)
+        {
+            // Store the row number before the prompt
+            (int column, int row) = Console.GetCursorPosition();
+
+            // Disable built-in prompt validation
+            prompt.Validator = null;
+            prompt.ValidationErrorMessage = string.Empty;
+
+            // Setup prompt to show editable default values
+            prompt.ShowDefaultValue = false;
+            prompt.EditableDefaultValue = true;
+
+            while (true)
+            {
+                string input = AnsiConsole.Prompt(prompt);
+                if (string.IsNullOrEmpty(input) && prompt.AllowEmpty)
+                    return input;
+
+                (bool isValid, string? errorMessage) = validator.Invoke(input);
+                if (!isValid)
+                {
+                    // Print error message and set the current input as the default value
+                    // for the existing prompt, so that the user can edit in-place
+                    AnsiConsole.MarkupLineInterpolated($"[red]{errorMessage}[/]");
+                    prompt.DefaultValue(input);
+                    Console.SetCursorPosition(column, row); // the updated prompt will cover the existing text perfectly
+                }
+                else
+                {
+                    Console.SetCursorPosition(column, row + 1);
+                    AnsiConsole.Write(new string(' ', Console.WindowWidth));  // clear error line
+                    Console.SetCursorPosition(column, row + 1);
+                    return input;
+                }
+            }
         }
 
 
@@ -421,15 +480,17 @@ namespace passwordbank
             AnsiConsole.WriteLine("Please insert the required account information:");
             AnsiConsole.Write('\n');
 
-            string accountName = AnsiConsole.Prompt(
+            string accountName = ValidatedTextPrompt(
                 new TextPrompt<string>("[darkorange3] - Website/Service:[/]")
-                    .ClearOnFinish(false)
+                    .ClearOnFinish(false),
+                AccountNameValidator
                 );
 
-            string emailAddress = AnsiConsole.Prompt(
+            string emailAddress = ValidatedTextPrompt(
                 new TextPrompt<string>("[darkorange3] - Email Address:[/]")
                     .AllowEmpty()
-                    .ClearOnFinish(false)
+                    .ClearOnFinish(false),
+                EmailAddressValidator
                 );
 
             string username = AnsiConsole.Prompt(
@@ -473,7 +534,7 @@ namespace passwordbank
             int startRow = ConsoleHelper.GetCurrentRow();
 
             // Action title
-            AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]DELETE CREDENTIAL[/]");
+            AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]EDIT CREDENTIAL[/]");
 
             // Authenticate the user
             string masterPassword = AuthenticationPrompt();
@@ -495,21 +556,32 @@ namespace passwordbank
             // Decrypt the previous credential information to use as default values
             var credentialInfo = credential.Decrypt(encryptionKey);
 
-            string accountName = AnsiConsole.Prompt(
+            // NOTE: use a special account name validator that avoids returning an error
+            //  if the account name is not modified (which would return an error with the default validator)
+            (bool, string?) ModifiedAccountNameValidator(string input)
+            {
+                if (string.Compare(input, credentialInfo.Name, StringComparison.OrdinalIgnoreCase) == 0)
+                    return (true, string.Empty);
+                else return AccountNameValidator(input);
+            }
+
+            string accountName = ValidatedTextPrompt(
                 new TextPrompt<string>("[darkorange3] - Website/Service:[/]")
                     .DefaultValue(credentialInfo.Name)
                     .EditableDefaultValue(true)
                     .HideDefaultValue()
-                    .ClearOnFinish(false)
+                    .ClearOnFinish(false),
+                ModifiedAccountNameValidator
                 );
 
-            string emailAddress = AnsiConsole.Prompt(
+            string emailAddress = ValidatedTextPrompt(
                 new TextPrompt<string>("[darkorange3] - Email Address:[/]")
                     .DefaultValue(credentialInfo.EmailAddress ?? string.Empty)
                     .EditableDefaultValue(true)
                     .HideDefaultValue()
                     .AllowEmpty()
-                    .ClearOnFinish(false)
+                    .ClearOnFinish(false),
+                EmailAddressValidator
                 );
 
             string username = AnsiConsole.Prompt(
@@ -523,7 +595,7 @@ namespace passwordbank
 
             string password = AnsiConsole.Prompt(
                 new TextPrompt<string>("[darkorange3] - Password:[/]")
-                    //.Secret()   // TODO: check if the default value works with secret inputs
+                    .Secret()
                     .DefaultValue(credentialInfo.Password)
                     .EditableDefaultValue(true)
                     .HideDefaultValue()
