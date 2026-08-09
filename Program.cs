@@ -201,11 +201,8 @@ namespace passwordbank
             // Open the database connection on the first use
             database ??= Database.Open(password);
 
-            if (database is null)
-                return string.Empty;
-
             // Check the password against the key stored in the database
-            if (!database.VerifyPassword(password))
+            if (database is null || !database.VerifyPassword(password))
             {
                 ConsoleHelper.ClearLastRows(startRow);
                 AnsiConsole.MarkupLine("[grey]>> AUTHENTICATION[/] [red]FAILED[/]");
@@ -330,6 +327,7 @@ namespace passwordbank
 
             // Authenticate the user
             string masterPassword = AuthenticationPrompt();
+            AnsiConsole.Write('\n');
 
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
@@ -337,7 +335,6 @@ namespace passwordbank
                 ConsoleHelper.ClearLastRows(startRow);
                 return;
             }
-            AnsiConsole.Write('\n');
 
             // Retrieve the list of credentials from the database
             List<EncryptedCredential> credentials = database.GetCredentials();
@@ -422,6 +419,7 @@ namespace passwordbank
 
             // Authenticate the user
             string masterPassword = AuthenticationPrompt();
+            AnsiConsole.Write('\n');
 
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
@@ -429,7 +427,6 @@ namespace passwordbank
                 ConsoleHelper.ClearLastRows(startRow);
                 return;
             }
-            AnsiConsole.Write('\n');
 
             // Generate decryption key from user password
             byte[] salt = database.GetEncryptionSalt();
@@ -468,6 +465,7 @@ namespace passwordbank
 
             // Authenticate the user and load the database
             string masterPassword = AuthenticationPrompt();
+            AnsiConsole.Write('\n');
 
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
@@ -476,7 +474,6 @@ namespace passwordbank
                 return;
             }
 
-            AnsiConsole.Write('\n');
             AnsiConsole.WriteLine("Please insert the required account information:");
             AnsiConsole.Write('\n');
 
@@ -538,6 +535,7 @@ namespace passwordbank
 
             // Authenticate the user
             string masterPassword = AuthenticationPrompt();
+            AnsiConsole.Write('\n');
 
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
@@ -546,7 +544,6 @@ namespace passwordbank
                 return;
             }
 
-            AnsiConsole.Write('\n');
             AnsiConsole.WriteLine("Update the credentials information:");
             AnsiConsole.Write('\n');
 
@@ -632,6 +629,7 @@ namespace passwordbank
 
             // Authenticate the user
             string masterPassword = AuthenticationPrompt();
+            AnsiConsole.Write('\n');
 
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
@@ -639,7 +637,6 @@ namespace passwordbank
                 ConsoleHelper.ClearLastRows(startRow);
                 return;
             }
-            AnsiConsole.Write('\n');
 
             if (database.Remove(credential))
                 AnsiConsole.MarkupLine("[green3_1]Credentials succesfully removed from the database![/]");
@@ -660,6 +657,7 @@ namespace passwordbank
 
             // Authenticate the user and load the database
             string currentPassword = AuthenticationPrompt();
+            AnsiConsole.Write('\n');
 
             if (string.IsNullOrEmpty(currentPassword) || database is null)
             {
@@ -667,7 +665,6 @@ namespace passwordbank
                 ConsoleHelper.ClearLastRows(startRow);
                 return;
             }
-            AnsiConsole.Write('\n');
 
             string firstPassword = AnsiConsole.Prompt(
                 new TextPrompt<string>("Choose your new [darkorange]master password[/]: ")
