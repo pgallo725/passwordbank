@@ -1,4 +1,6 @@
-﻿namespace passwordbank
+﻿using PasswordBank.Cryptography;
+
+namespace PasswordBank.DataModel
 {
     internal record CredentialInfo
     {
@@ -9,7 +11,7 @@
 
         public EncryptedCredential Encrypt(byte[] key)
         {
-            byte[] iv = Random.GenerateBytes(16);
+            byte[] iv = Cryptography.Random.GenerateBytes(16);
             return new EncryptedCredential()
             {
                 Name = Name,

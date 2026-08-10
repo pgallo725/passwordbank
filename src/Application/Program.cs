@@ -1,6 +1,9 @@
-﻿using Spectre.Console;
+﻿using PasswordBank.Cryptography;
+using PasswordBank.DataModel;
+using PasswordBank.Utils;
+using Spectre.Console;
 
-namespace passwordbank
+namespace PasswordBank
 {
     internal class Program
     {

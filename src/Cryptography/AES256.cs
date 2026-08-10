@@ -1,10 +1,10 @@
 ﻿using System.Security.Cryptography;
 
-namespace passwordbank
+namespace PasswordBank.Cryptography
 {
     /// <summary>
-    /// A static utility class that provides functions to encrypt and decrypt data using the AES-256 cryptographic algorithm.
-    /// NOTE: the code for this class is taken from the Microsoft sample code (with some modifications):
+    /// A static utility class that provides functions to encrypt and decrypt data using the AES-256 cryptographic algorithm.<br/>
+    /// NOTE: the code for this class is taken from the Microsoft sample code (with some modifications):<br/>
     ///   https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.aes?view=net-10.0
     /// </summary>
     internal class AES256

@@ -1,7 +1,11 @@
 ﻿using System.Security.Cryptography;
 
-namespace passwordbank
+namespace PasswordBank.Cryptography
 {
+    /// <summary>
+    /// A static utility class that provides a function to generate an encryption key<br/>
+    ///  using the PBKDF2 key derivation method with some pre-defined parameters.
+    /// </summary>
     internal class PBKDF2
     {
         public static byte[] GenerateKey(string password, byte[] salt)

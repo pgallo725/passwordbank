@@ -1,6 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
+using PasswordBank.Cryptography;
 
-namespace passwordbank
+namespace PasswordBank.DataModel
 {
     internal class Database : IDisposable
     {
@@ -70,8 +71,8 @@ namespace passwordbank
                 command.ExecuteNonQuery();
 
                 // Generate the master salts and the master password hash
-                byte[] verificationSalt = Random.GenerateBytes(16);
-                byte[] encryptionSalt = Random.GenerateBytes(16);
+                byte[] verificationSalt = Cryptography.Random.GenerateBytes(16);
+                byte[] encryptionSalt = Cryptography.Random.GenerateBytes(16);
                 byte[] masterPasswordHash = PBKDF2.GenerateKey(password, verificationSalt);
 
                 // Insert these values into the ServiceData table
