@@ -378,8 +378,8 @@ namespace PasswordBank.DataModel
                 VALUES( $account, $email, $username, $password, $iv );
                 """;
             command.Parameters.AddWithValue("$account", record.Name);
-            command.Parameters.AddWithValue("$email", record.EmailAddress);
-            command.Parameters.AddWithValue("$username", record.Username);
+            command.Parameters.AddWithValue("$email", record.EmailAddress ?? string.Empty);
+            command.Parameters.AddWithValue("$username", record.Username ?? string.Empty);
             command.Parameters.AddWithValue("$password", record.EncryptedPassword);
             command.Parameters.AddWithValue("$iv", record.EncryptionIV);
             int added = command.ExecuteNonQuery();
@@ -402,8 +402,8 @@ namespace PasswordBank.DataModel
                 WHERE AccountName = $oldAccount;
                 """;
             command.Parameters.AddWithValue("$newAccount", newRecord.Name);
-            command.Parameters.AddWithValue("$email", newRecord.EmailAddress);
-            command.Parameters.AddWithValue("$username", newRecord.Username);
+            command.Parameters.AddWithValue("$email", newRecord.EmailAddress ?? string.Empty);
+            command.Parameters.AddWithValue("$username", newRecord.Username ?? string.Empty);
             command.Parameters.AddWithValue("$password", newRecord.EncryptedPassword);
             command.Parameters.AddWithValue("$iv", newRecord.EncryptionIV);
             command.Parameters.AddWithValue("$oldAccount", oldRecord.Name);
