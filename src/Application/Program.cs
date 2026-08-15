@@ -1,4 +1,5 @@
-﻿using PasswordBank.Cryptography;
+﻿using PasswordBank.Application;
+using PasswordBank.Cryptography;
 using PasswordBank.DataModel;
 using PasswordBank.Utils;
 using Spectre.Console;
@@ -48,27 +49,6 @@ namespace PasswordBank
         }
 
 
-        static (bool, string?) EmailAddressValidator(string emailAddress)
-        {
-            // Consider an email address correct if it can be used to construct a valid MailAddress object
-            if (System.Net.Mail.MailAddress.TryCreate(emailAddress, out var _))
-                return (true, string.Empty);
-            else return (false, "The input does not match the format of a valid email address.");
-        }
-
-        static (bool, string?) AccountNameValidator(string accountName)
-        {
-            // Check if the account name is not empty and doesn't already exist in the database
-            if (string.IsNullOrWhiteSpace(accountName))
-                return (false, "The account name must contain atleast 1 non-whitespace character.");
-            if (database is null)
-                return (false, "Cannot access the database for checking the username.");
-            else if (database.Contains(accountName))
-                return (false, "An account with the same name already exists in the database.");
-            else return (true, string.Empty);
-        }
-
-
         /// <summary>
         /// An open connection to the credentials database, this is realized the first time <br/>
         ///  that it's required and then cached for the lifetime of the program.
@@ -88,17 +68,17 @@ namespace PasswordBank
         static void Main(string[] args)
         {
             // Application title
-            Console.Title = "PasswordBank v0.1";
+            Console.Title = "PasswordBank v1.0.0";
             AnsiConsole.MarkupLine("""
                 [green3]
-                      _____                                           _  ____                 _    
-                     |  __ \                                         | ||  _ \               | |   
-                     | |__) |__ _  ___  ___ __      __ ___   _ __  __| || |_) |  __ _  _ __  | | __
-                     |  ___// _` |/ __|/ __|\ \ /\ / // _ \ | '__|/ _` ||  _ <  / _` || '_ \ | |/ /
-                     | |   | (_| |\__ \\__ \ \ V  V /| (_) || |  | (_| || |_) || (_| || | | ||   < 
-                     |_|    \__,_||___/|___/  \_/\_/  \___/ |_|   \__,_||____/  \__,_||_| |_||_|\_\
+                       _____                                           _  ____                 _    
+                      |  __ \                                         | ||  _ \               | |   
+                      | |__) |__ _  ___  ___ __      __ ___   _ __  __| || |_) |  __ _  _ __  | | __
+                      |  ___// _` |/ __|/ __|\ \ /\ / // _ \ | '__|/ _` ||  _ <  / _` || '_ \ | |/ /
+                      | |   | (_| |\__ \\__ \ \ V  V /| (_) || |  | (_| || |_) || (_| || | | ||   < 
+                      |_|    \__,_||___/|___/  \_/\_/  \___/ |_|   \__,_||____/  \__,_||_| |_||_|\_\
                 [/][darkorange3_1]
-                   Version 0.1                                                      developed by JackaL
+                   Version 1.0.0                                                    developed by JackaL
                 [/][green3]
                  ________________________________________________________________________________________
                 [/]
@@ -107,18 +87,27 @@ namespace PasswordBank
             // Trigger database creation workflow if 'credentials.db' file is not found
             if (!File.Exists(Database.DatabaseFilePath))
             {
-                bool success = Action_CreateDatabase();
-                if (!success)
-                    return;
+                ConsoleHelper.SaveCheckpoint();
+                {
+                    bool success = Action_CreateDatabase();
+                    if (!success)
+                        return;
+                }
+                ConsoleHelper.RestoreCheckpoint();
+                ConsoleHelper.DeleteCheckpoint();
             }
+
+            ConsoleHelper.SaveCheckpoint();
 
             // Application loop
             while (true)
             {
-                int menuStartRow = ConsoleHelper.GetCurrentRow();
                 try
                 {
-                    switch (MainMenuPrompt())
+                    MainMenuAction action = MainMenuPrompt();
+                    ConsoleHelper.RestoreCheckpoint();
+
+                    switch (action)
                     {
                         case MainMenuAction.View:
                             Action_ListCredentials();
@@ -146,8 +135,9 @@ namespace PasswordBank
                     // Print error message, wait for user confirmation and reset main menu
                     AnsiConsole.MarkupLineInterpolated($"\n[red][[ERROR]] {e.Message}[/]");
                     ContinuationPrompt();
-                    ConsoleHelper.ClearLastRows(menuStartRow);
                 }
+
+                ConsoleHelper.RestoreCheckpoint();
             }
         }
 
@@ -186,47 +176,7 @@ namespace PasswordBank
         }
 
 
-        private static string AuthenticationPrompt()
-        {
-            // Store the row number before the prompt
-            int startRow = ConsoleHelper.GetCurrentRow();
-
-            // Action title
-            AnsiConsole.MarkupLine("[grey]>> AUTHENTICATION[/]\n");
-
-            string password = AnsiConsole.Prompt(
-                new TextPrompt<string>("Insert your [slowblink darkorange]master password[/]: ")
-                    .Secret()
-                    .ClearOnFinish(false)
-                );
-
-            // Open the database connection on the first use
-            database ??= Database.Open(password);
-
-            // Check the password against the key stored in the database
-            if (database is null || !database.VerifyPassword(password))
-            {
-                ConsoleHelper.ClearLastRows(startRow);
-                AnsiConsole.MarkupLine("[grey]>> AUTHENTICATION[/] [red]FAILED[/]");
-                return string.Empty;
-            }
-            else
-            {
-                ConsoleHelper.ClearLastRows(startRow);
-                AnsiConsole.MarkupLine("[grey]>> AUTHENTICATION[/] [green3]SUCCESSFUL[/]");
-                return password;
-            }
-        }
-
-
-        private static void ContinuationPrompt()
-        {
-            AnsiConsole.Markup("[grey]Press[/] [gray70 slowblink]Enter[/] [grey]to continue...[/]");
-            ConsoleHelper.WaitForEnterKey();
-        }
-
-
-        private static string ValidatedTextPrompt(TextPrompt<string> prompt, Func<string, (bool, string?)> validator)
+        private static string ValidatedTextPrompt(TextPrompt<string> prompt, IValidator validator)
         {
             // Store the row number before the prompt
             (int column, int row) = Console.GetCursorPosition();
@@ -245,7 +195,7 @@ namespace PasswordBank
                 if (string.IsNullOrEmpty(input) && prompt.AllowEmpty)
                     return input;
 
-                (bool isValid, string? errorMessage) = validator.Invoke(input);
+                (bool isValid, string? errorMessage) = validator.Validate(input);
                 if (!isValid)
                 {
                     // Print error message and set the current input as the default value
@@ -265,17 +215,56 @@ namespace PasswordBank
         }
 
 
-        // TODO: review
+        private static void ContinuationPrompt()
+        {
+            AnsiConsole.Markup("[grey]Press[/] [gray70 slowblink]Enter[/] [grey]to continue...[/]");
+            ConsoleHelper.WaitForEnterKey();
+        }
+
+
+        private static string AuthenticationPrompt()
+        {
+            // Action title
+            AnsiConsole.Markup("[grey]>> AUTHENTICATION[/]");
+
+            ConsoleHelper.SaveCheckpoint();
+
+            AnsiConsole.Write('\n');
+            AnsiConsole.Write('\n');
+
+            string password = AnsiConsole.Prompt(
+                new TextPrompt<string>("Insert your [slowblink darkorange]master password[/]: ")
+                    .Secret()
+                    .ClearOnFinish(false)
+                );
+
+            // Open the database connection on the first use
+            database ??= Database.Open(password);
+
+            ConsoleHelper.RestoreCheckpoint();
+            ConsoleHelper.DeleteCheckpoint();
+
+            // Check the password against the key stored in the database
+            if (database is null || !database.VerifyPassword(password))
+            {
+                AnsiConsole.MarkupLine(" [red]FAILED[/]");
+                return string.Empty;
+            }
+            else
+            {
+                AnsiConsole.MarkupLine(" [green3]SUCCESSFUL[/]");
+                return password;
+            }
+        }
+
+
         private static bool Action_CreateDatabase()
         {
-            // Store the row number before the prompt
-            int startRow = ConsoleHelper.GetCurrentRow();
-
             AnsiConsole.MarkupLine("Welcome to [green3]PasswordBank[/]!");
             AnsiConsole.MarkupLine("No [italic]credentials.db[/] file detected, [slowblink]initializing new database...[/]\n");
 
             // Repeat the following block until the user provides matching passwords
-            int startRowPasswords = ConsoleHelper.GetCurrentRow();
+            ConsoleHelper.SaveCheckpoint();
             while (true)
             {
                 string firstPassword = AnsiConsole.Prompt(
@@ -285,7 +274,7 @@ namespace PasswordBank
                     );
 
                 string secondPassword = AnsiConsole.Prompt(
-                    new TextPrompt<string>("\tConfirm your [darkorange]master password[/]: ")
+                    new TextPrompt<string>("Confirm your [darkorange]master password[/]: ")
                         .Secret()
                         .ClearOnFinish(false)
                     );
@@ -296,6 +285,8 @@ namespace PasswordBank
                     try
                     {
                         Database.Create(firstPassword);
+
+                        AnsiConsole.Write('\n');
                         AnsiConsole.MarkupLine("[green3_1]Succesfully created credentials database![/]");
                         result = true;
                     }
@@ -305,15 +296,18 @@ namespace PasswordBank
                         AnsiConsole.MarkupLine("[red]Failed to create credentials database![/]");
                         result = false;
                     }
+
                     ContinuationPrompt();
-                    ConsoleHelper.ClearLastRows(startRow);
+                    ConsoleHelper.DeleteCheckpoint();
                     return result;
                 }
                 else
                 {
+                    AnsiConsole.Write('\n');
                     AnsiConsole.MarkupLine("[red]The provided passwords do not match, please retry.[/]");
+
                     ContinuationPrompt();
-                    ConsoleHelper.ClearLastRows(startRowPasswords);
+                    ConsoleHelper.RestoreCheckpoint();
                 }
             }
         }
@@ -321,9 +315,6 @@ namespace PasswordBank
 
         private static void Action_ListCredentials()
         {
-            // Store the row number before the prompt
-            int startRow = ConsoleHelper.GetCurrentRow();
-
             // Action title
             AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]VIEW CREDENTIALS[/]");
 
@@ -334,7 +325,6 @@ namespace PasswordBank
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
                 ContinuationPrompt();
-                ConsoleHelper.ClearLastRows(startRow);
                 return;
             }
 
@@ -353,16 +343,11 @@ namespace PasswordBank
                     credentials
                 );
             }
-
-            ConsoleHelper.ClearLastRows(startRow);
         }
 
 
         private static void Action_SearchCredentials()
         {
-            // Store the row number before the prompt
-            int startRow = ConsoleHelper.GetCurrentRow();
-
             // Action title
             AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]SEARCH CREDENTIALS[/]");
 
@@ -373,7 +358,6 @@ namespace PasswordBank
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
                 ContinuationPrompt();
-                ConsoleHelper.ClearLastRows(startRow);
                 return;
             }
 
@@ -398,8 +382,6 @@ namespace PasswordBank
                     credentials
                 );
             }
-
-            ConsoleHelper.ClearLastRows(startRow);
         }
 
 
@@ -414,6 +396,8 @@ namespace PasswordBank
                 EncryptedPassword = [],
                 EncryptionIV = []
             };
+
+            ConsoleHelper.SaveCheckpoint();
 
             while (true)
             {
@@ -433,7 +417,7 @@ namespace PasswordBank
                 if (credential == nullCredential)
                     break;
 
-                int credentialMenuStartRow = ConsoleHelper.GetCurrentRow();
+                ConsoleHelper.RestoreCheckpoint();
 
                 switch (CredentialActionPrompt())
                 {
@@ -453,16 +437,15 @@ namespace PasswordBank
                         break;
                 }
 
-                ConsoleHelper.ClearLastRows(credentialMenuStartRow);
+                ConsoleHelper.RestoreCheckpoint();
             }
+
+            ConsoleHelper.DeleteCheckpoint();
         }
 
 
         private static void Action_ViewCredential(EncryptedCredential credential)
         {
-            // Store the row number before the prompt
-            int startRow = ConsoleHelper.GetCurrentRow();
-
             // Action title
             AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]VIEW CREDENTIAL INFORMATION[/]");
 
@@ -473,7 +456,6 @@ namespace PasswordBank
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
                 ContinuationPrompt();
-                ConsoleHelper.ClearLastRows(startRow);
                 return;
             }
 
@@ -500,15 +482,11 @@ namespace PasswordBank
             AnsiConsole.Write('\n');
 
             ContinuationPrompt();
-            ConsoleHelper.ClearLastRows(startRow);
         }
 
 
         private static void Action_AddCredential()
         {
-            // Store the row number before the prompt
-            int startRow = ConsoleHelper.GetCurrentRow();
-
             // Action title
             AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]ADD ACCOUNT[/]");
 
@@ -519,7 +497,6 @@ namespace PasswordBank
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
                 ContinuationPrompt();
-                ConsoleHelper.ClearLastRows(startRow);
                 return;
             }
 
@@ -529,14 +506,14 @@ namespace PasswordBank
             string accountName = ValidatedTextPrompt(
                 new TextPrompt<string>("[darkorange3] - Website/Service:[/]")
                     .ClearOnFinish(false),
-                AccountNameValidator
+                new AccountNameValidator(database)
                 );
 
             string emailAddress = ValidatedTextPrompt(
                 new TextPrompt<string>("[darkorange3] - Email Address:[/]")
                     .AllowEmpty()
                     .ClearOnFinish(false),
-                EmailAddressValidator
+                new EmailAddressValidator()
                 );
 
             string username = AnsiConsole.Prompt(
@@ -570,15 +547,11 @@ namespace PasswordBank
             else AnsiConsole.MarkupLine("\n[red]Failed to add the credentials to the database[/]");
 
             ContinuationPrompt();
-            ConsoleHelper.ClearLastRows(startRow);
         }
 
 
         private static void Action_EditCredential(EncryptedCredential credential)
         {
-            // Store the row number before the prompt
-            int startRow = ConsoleHelper.GetCurrentRow();
-
             // Action title
             AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]EDIT CREDENTIAL[/]");
 
@@ -589,7 +562,6 @@ namespace PasswordBank
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
                 ContinuationPrompt();
-                ConsoleHelper.ClearLastRows(startRow);
                 return;
             }
 
@@ -602,22 +574,13 @@ namespace PasswordBank
             // Decrypt the previous credential information to use as default values
             var credentialInfo = credential.Decrypt(encryptionKey);
 
-            // NOTE: use a special account name validator that avoids returning an error
-            //  if the account name is not modified (which would return an error with the default validator)
-            (bool, string?) ModifiedAccountNameValidator(string input)
-            {
-                if (string.Compare(input, credentialInfo.Name, StringComparison.OrdinalIgnoreCase) == 0)
-                    return (true, string.Empty);
-                else return AccountNameValidator(input);
-            }
-
             string accountName = ValidatedTextPrompt(
                 new TextPrompt<string>("[darkorange3] - Website/Service:[/]")
                     .DefaultValue(credentialInfo.Name)
                     .EditableDefaultValue(true)
                     .HideDefaultValue()
                     .ClearOnFinish(false),
-                ModifiedAccountNameValidator
+                new AccountNameEditValidator(database, credentialInfo)
                 );
 
             string emailAddress = ValidatedTextPrompt(
@@ -627,7 +590,7 @@ namespace PasswordBank
                     .HideDefaultValue()
                     .AllowEmpty()
                     .ClearOnFinish(false),
-                EmailAddressValidator
+                new EmailAddressValidator()
                 );
 
             string username = AnsiConsole.Prompt(
@@ -673,15 +636,11 @@ namespace PasswordBank
             else AnsiConsole.MarkupLine("\n[red]Failed to update the credentials in the database[/]");
 
             ContinuationPrompt();
-            ConsoleHelper.ClearLastRows(startRow);
         }
 
 
         private static void Action_DeleteCredential(EncryptedCredential credential, List<EncryptedCredential> credentials)
         {
-            // Store the row number before the prompt
-            int startRow = ConsoleHelper.GetCurrentRow();
-
             // Action title
             AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]DELETE CREDENTIAL[/]");
 
@@ -692,7 +651,6 @@ namespace PasswordBank
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
                 ContinuationPrompt();
-                ConsoleHelper.ClearLastRows(startRow);
                 return;
             }
 
@@ -706,15 +664,11 @@ namespace PasswordBank
             else AnsiConsole.MarkupLine("[red]Failed to remove the credentials from the database[/]");
 
             ContinuationPrompt();
-            ConsoleHelper.ClearLastRows(startRow);
         }
 
 
         private static void Action_ChangeMasterPassword()
         {
-            // Store the row number before the prompt
-            int startRow = ConsoleHelper.GetCurrentRow();
-
             // Action title
             AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]CHANGE MASTER PASSWORD[/]");
 
@@ -725,7 +679,6 @@ namespace PasswordBank
             if (string.IsNullOrEmpty(currentPassword) || database is null)
             {
                 ContinuationPrompt();
-                ConsoleHelper.ClearLastRows(startRow);
                 return;
             }
 
@@ -762,7 +715,6 @@ namespace PasswordBank
             }
 
             ContinuationPrompt();
-            ConsoleHelper.ClearLastRows(startRow);
         }
     }
 }

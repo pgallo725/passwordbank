@@ -64,23 +64,66 @@ namespace PasswordBank.Utils
         }
 
 
-        public static int GetCurrentRow()
+        private readonly struct ConsolePosition
         {
-            (int _, int row) = Console.GetCursorPosition();
-            return row;
+            public int Row    { get; init; }
+            public int Column { get; init; }
+        }
+        private static readonly Stack<ConsolePosition> checkpoints = [];
+
+
+        public static void SaveCheckpoint()
+        {
+            (int column, int row) = Console.GetCursorPosition();
+            checkpoints.Push(new ConsolePosition()
+            {
+                Row = row,
+                Column = column
+            });
         }
 
-        public static void ClearLastRows(int startRow)
+        public static void RestoreCheckpoint()
         {
-            int currentRow = GetCurrentRow();
-            int nRowsToClear = Math.Clamp(currentRow - startRow, 0, int.MaxValue);
-            string clearLine = new(' ', Console.WindowWidth);
+            if (checkpoints.Count > 0)
+            {
+                (int column, int row) = Console.GetCursorPosition();
+                var currentPosition = new ConsolePosition()
+                {
+                    Row = row,
+                    Column = column
+                };
+                var checkpointPosition = checkpoints.Peek();
 
-            AnsiConsole.Write('\r');                       // return to line start
-            AnsiConsole.Write($"\x1b[{nRowsToClear+1}A");  // move cursor back to startRow
-            for (int i = 0; i <= nRowsToClear; i++)        // repeat for nRowsToClear+1 lines
-                AnsiConsole.WriteLine(clearLine);          // overwrite the whole line with whitespace characters
-            AnsiConsole.Write($"\x1b[{nRowsToClear+1}A");  // move cursor back to startRow
+                ClearRegion(checkpointPosition, currentPosition);
+                Console.SetCursorPosition(checkpointPosition.Column, checkpointPosition.Row);
+            }
+        }
+
+        public static void DeleteCheckpoint()
+        {
+            if (checkpoints.Count > 0)
+                checkpoints.Pop();
+        }
+
+
+        private static void ClearRegion(ConsolePosition start, ConsolePosition end)
+        {
+            // Position the cursor at the start of the clear region
+            Console.SetCursorPosition(start.Column, start.Row);
+
+            // Clear the rest of the first row after start.Column
+            for (int i = 0; i < Console.WindowWidth - start.Column; i++)
+                AnsiConsole.Write(' ');
+            AnsiConsole.Write('\n');
+
+            // Clear all full rows between start.Row and end.Row
+            string clearLine = new(' ', Console.WindowWidth);
+            for (int i = 0; i < end.Row - start.Row - 1; i++)
+                AnsiConsole.WriteLine(clearLine);
+
+            // Clear the part of the last row before end.Column
+            for (int i = 0; i < end.Column; i++)
+                AnsiConsole.Write(' ');
         }
     }
 }
