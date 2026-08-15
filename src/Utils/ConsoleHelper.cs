@@ -108,22 +108,20 @@ namespace PasswordBank.Utils
 
         private static void ClearRegion(ConsolePosition start, ConsolePosition end)
         {
+            string clearLine = new(' ', Console.WindowWidth);
+
             // Position the cursor at the start of the clear region
             Console.SetCursorPosition(start.Column, start.Row);
 
             // Clear the rest of the first row after start.Column
-            for (int i = 0; i < Console.WindowWidth - start.Column; i++)
-                AnsiConsole.Write(' ');
-            AnsiConsole.Write('\n');
+            AnsiConsole.WriteLine(clearLine[start.Column..]);
 
             // Clear all full rows between start.Row and end.Row
-            string clearLine = new(' ', Console.WindowWidth);
             for (int i = 0; i < end.Row - start.Row - 1; i++)
                 AnsiConsole.WriteLine(clearLine);
 
             // Clear the part of the last row before end.Column
-            for (int i = 0; i < end.Column; i++)
-                AnsiConsole.Write(' ');
+            AnsiConsole.Write(clearLine[..end.Column]);
         }
     }
 }
