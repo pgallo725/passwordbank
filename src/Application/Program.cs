@@ -64,6 +64,18 @@ namespace PasswordBank
             Decoration = Decoration.None
         };
 
+        /// <summary>
+        /// A 'null' EncryptedCredential object to use as cancellation result.
+        /// </summary>
+        private static readonly EncryptedCredential NullCredential = new()
+        {
+            Name = string.Empty,
+            EmailAddress = null,
+            Username = null,
+            EncryptedPassword = [],
+            EncryptionIV = []
+        };
+
 
         static void Main(string[] args)
         {
@@ -104,18 +116,90 @@ namespace PasswordBank
             {
                 try
                 {
-                    MainMenuAction action = MainMenuPrompt();
+                    // Show the main menu
+                    MainMenuAction mainAction = AnsiConsole.Prompt(
+                        new SelectionPrompt<MainMenuAction>()
+                            .Title("Select one of the available [darkorange]operations[/]: ")
+                            .UseConverter(MainMenuActionTextConverter)
+                            .AddChoices(MainMenuAction.View,
+                                        MainMenuAction.Search,
+                                        MainMenuAction.Add,
+                                        MainMenuAction.ChangePassword,
+                                        MainMenuAction.Quit)
+                            .AddCancelResult(MainMenuAction.Quit)
+                            .HighlightStyle(HighlightStyle)
+                    );
+                    // Clear the main menu before continuing into the selected action
                     ConsoleHelper.RestoreCheckpoint();
 
-                    switch (action)
+                    switch (mainAction)
                     {
                         case MainMenuAction.View:
-                            Action_ListCredentials();
-                            break;
-
                         case MainMenuAction.Search:
-                            Action_SearchCredentials();
-                            break;
+                        {
+                            // Retrieve the list of relevant passwords from the database (after authentication)
+                            List<EncryptedCredential>? credentials = mainAction switch
+                            {
+                                MainMenuAction.View => Action_ListCredentials(),
+                                MainMenuAction.Search => Action_SearchCredentials(),
+                                _ => null
+                            };
+                            ConsoleHelper.RestoreCheckpoint();
+
+                            if (credentials is null)
+                                break;
+
+                            if (credentials.Count == 0)
+                            {
+                                AnsiConsole.WriteLine("No credentials found in the database.\n");
+                                ContinuationPrompt();
+                            }
+                            else while (true)
+                            {
+                                // Display the list of credentials and let the user select one
+                                EncryptedCredential credential = AnsiConsole.Prompt(
+                                    new SelectionPrompt<EncryptedCredential>()
+                                        .Title("Select one of the following credential records to access further options:")
+                                        .UseConverter(c => c.Name)
+                                        .AddChoices(credentials)
+                                        .AddCancelResult(NullCredential)
+                                        .PageSize(10)
+                                        .MoreChoicesText("[grey](Use arrow keys to see more credentials)[/]")
+                                        .WrapAround(true)
+                                        .HighlightStyle(HighlightStyle)
+                                );
+                                // Clear the credentials list before continuing to the next menu
+                                ConsoleHelper.RestoreCheckpoint();
+
+                                if (credential == NullCredential)
+                                    break;
+
+                                // Show the menu to choose the action for the selected credential
+                                CredentialAction credentialAction = AnsiConsole.Prompt(
+                                    new SelectionPrompt<CredentialAction>()
+                                        .Title("What do you want to do with the selected credential record?")
+                                        .UseConverter(CredentialActionTextConverter)
+                                        .AddChoices(CredentialAction.View,
+                                                    CredentialAction.Edit,
+                                                    CredentialAction.Delete,
+                                                    CredentialAction.Cancel)
+                                        .AddCancelResult(CredentialAction.Cancel)
+                                        .HighlightStyle(HighlightStyle)
+                                );
+                                // Clear the menu before continuing into the selected action
+                                ConsoleHelper.RestoreCheckpoint();
+
+                                switch (credentialAction)
+                                {
+                                    case CredentialAction.View:   Action_ViewCredential(credential);                break;
+                                    case CredentialAction.Edit:   Action_EditCredential(credential);                break;
+                                    case CredentialAction.Delete: Action_DeleteCredential(credential, credentials); break;
+                                    case CredentialAction.Cancel: /* nothing to do, show the previous menu again */ break;
+                                }
+                                // Clear everything before showing the (updated) list of credentials again
+                                ConsoleHelper.RestoreCheckpoint();
+                            }
+                        } break;
 
                         case MainMenuAction.Add:
                             Action_AddCredential();
@@ -132,48 +216,18 @@ namespace PasswordBank
                 }
                 catch (Exception e)
                 {
-                    // Print error message, wait for user confirmation and reset main menu
+                    // Print error message, wait for user confirmation and reset to main menu
                     AnsiConsole.MarkupLineInterpolated($"\n[red][[ERROR]] {e.Message}[/]");
                     ContinuationPrompt();
                 }
 
+                // Clear everything before showing the main menu again
                 ConsoleHelper.RestoreCheckpoint();
             }
         }
 
 
 
-        private static MainMenuAction MainMenuPrompt()
-        {
-            return AnsiConsole.Prompt(
-                new SelectionPrompt<MainMenuAction>()
-                    .Title("Select one of the available [darkorange]operations[/]: ")
-                    .UseConverter(MainMenuActionTextConverter)
-                    .AddChoices(MainMenuAction.View,
-                                MainMenuAction.Search,
-                                MainMenuAction.Add,
-                                MainMenuAction.ChangePassword,
-                                MainMenuAction.Quit)
-                    .AddCancelResult(MainMenuAction.Quit)
-                    .HighlightStyle(HighlightStyle)
-                );
-        }
-
-
-        private static CredentialAction CredentialActionPrompt()
-        {
-            return AnsiConsole.Prompt(
-                new SelectionPrompt<CredentialAction>()
-                    .Title("Select what to do with the selected credential record: ")
-                    .UseConverter(CredentialActionTextConverter)
-                    .AddChoices(CredentialAction.View,
-                                CredentialAction.Edit,
-                                CredentialAction.Delete,
-                                CredentialAction.Cancel)
-                    .AddCancelResult(CredentialAction.Cancel)
-                    .HighlightStyle(HighlightStyle)
-                );
-        }
 
 
         private static string ValidatedTextPrompt(TextPrompt<string> prompt, IValidator validator)
@@ -313,7 +367,58 @@ namespace PasswordBank
         }
 
 
-        private static void Action_ListCredentials()
+        private static void Action_ChangeMasterPassword()
+        {
+            // Action title
+            AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]CHANGE MASTER PASSWORD[/]");
+
+            // Authenticate the user and load the database
+            string currentPassword = AuthenticationPrompt();
+            AnsiConsole.Write('\n');
+
+            if (string.IsNullOrEmpty(currentPassword) || database is null)
+            {
+                ContinuationPrompt();
+                return;
+            }
+
+            string firstPassword = AnsiConsole.Prompt(
+                new TextPrompt<string>("Choose your new [darkorange]master password[/]: ")
+                    .Secret()
+                    .ClearOnFinish(false)
+                );
+
+            string secondPassword = AnsiConsole.Prompt(
+                new TextPrompt<string>("\tConfirm your new [darkorange]master password[/]: ")
+                    .Secret()
+                    .ClearOnFinish(false)
+                );
+
+            if (firstPassword == secondPassword)
+            {
+                // Update the master password in the database (re-encrypt all data)
+                if (database.ChangePassword(currentPassword, firstPassword))
+                {
+                    AnsiConsole.Write('\n');
+                    AnsiConsole.MarkupLine("[green3_1]Succesfully updated master password![/]");
+                }
+                else
+                {
+                    AnsiConsole.Write('\n');
+                    AnsiConsole.MarkupLine("[red3_1]Failed to update the master password![/]");
+                }
+            }
+            else
+            {
+                AnsiConsole.Write('\n');
+                AnsiConsole.MarkupLine("[red3_1]The provided passwords do not match.[/] ");
+            }
+
+            ContinuationPrompt();
+        }
+
+
+        private static List<EncryptedCredential>? Action_ListCredentials()
         {
             // Action title
             AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]VIEW CREDENTIALS[/]");
@@ -325,28 +430,17 @@ namespace PasswordBank
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
                 ContinuationPrompt();
-                return;
+                return null;
             }
 
             // Retrieve the list of credentials from the database
             List<EncryptedCredential> credentials = database.GetCredentials();
 
-            if (credentials.Count == 0)
-            {
-                AnsiConsole.WriteLine("The credentials database is empty.\n");
-                ContinuationPrompt();
-            }
-            else
-            {
-                Action_InteractWithCredentials(
-                    "Here's the list of all credentials stored in the database: ",
-                    credentials
-                );
-            }
+            return credentials;
         }
 
 
-        private static void Action_SearchCredentials()
+        private static List<EncryptedCredential>? Action_SearchCredentials()
         {
             // Action title
             AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]SEARCH CREDENTIALS[/]");
@@ -358,7 +452,7 @@ namespace PasswordBank
             if (string.IsNullOrEmpty(masterPassword) || database is null)
             {
                 ContinuationPrompt();
-                return;
+                return null;
             }
 
             // Get the search string from user input
@@ -370,77 +464,7 @@ namespace PasswordBank
             // Retrieve the list of credentials from the database
             List<EncryptedCredential> credentials = database.Search(searchString);
 
-            if (credentials.Count == 0)
-            {
-                AnsiConsole.MarkupLineInterpolated($"No credentials match your search for [darkorange3]'{searchString}'[/].\n");
-                ContinuationPrompt();
-            }
-            else
-            {
-                Action_InteractWithCredentials(
-                    $"Here's a list of credentials that match your search for [darkorange3]'{searchString}'[/]: ",
-                    credentials
-                );
-            }
-        }
-
-
-        private static void Action_InteractWithCredentials(string headerText, List<EncryptedCredential> credentials)
-        {
-            // Create a 'null' EncryptedCredential object to use as cancellation result
-            EncryptedCredential nullCredential = new()
-            {
-                Name = string.Empty,
-                EmailAddress = null,
-                Username = null,
-                EncryptedPassword = [],
-                EncryptionIV = []
-            };
-
-            ConsoleHelper.SaveCheckpoint();
-
-            while (true)
-            {
-                // Display the list of credentials and let the user select one
-                EncryptedCredential credential = AnsiConsole.Prompt(
-                    new SelectionPrompt<EncryptedCredential>()
-                        .Title(headerText)
-                        .UseConverter(c => c.Name)
-                        .AddChoices(credentials)
-                        .AddCancelResult(nullCredential)
-                        .PageSize(10)
-                        .MoreChoicesText("[grey](Use arrow keys to see more credentials)[/]")
-                        .WrapAround(true)
-                        .HighlightStyle(HighlightStyle)
-                    );
-
-                if (credential == nullCredential)
-                    break;
-
-                ConsoleHelper.RestoreCheckpoint();
-
-                switch (CredentialActionPrompt())
-                {
-                    case CredentialAction.View:
-                        Action_ViewCredential(credential);
-                        break;
-
-                    case CredentialAction.Edit:
-                        Action_EditCredential(credential);
-                        break;
-
-                    case CredentialAction.Delete:
-                        Action_DeleteCredential(credential, credentials);
-                        break;
-
-                    case CredentialAction.Cancel:
-                        break;
-                }
-
-                ConsoleHelper.RestoreCheckpoint();
-            }
-
-            ConsoleHelper.DeleteCheckpoint();
+            return credentials;
         }
 
 
@@ -662,57 +686,6 @@ namespace PasswordBank
                 credentials.Remove(credential);
             }
             else AnsiConsole.MarkupLine("[red]Failed to remove the credentials from the database[/]");
-
-            ContinuationPrompt();
-        }
-
-
-        private static void Action_ChangeMasterPassword()
-        {
-            // Action title
-            AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]CHANGE MASTER PASSWORD[/]");
-
-            // Authenticate the user and load the database
-            string currentPassword = AuthenticationPrompt();
-            AnsiConsole.Write('\n');
-
-            if (string.IsNullOrEmpty(currentPassword) || database is null)
-            {
-                ContinuationPrompt();
-                return;
-            }
-
-            string firstPassword = AnsiConsole.Prompt(
-                new TextPrompt<string>("Choose your new [darkorange]master password[/]: ")
-                    .Secret()
-                    .ClearOnFinish(false)
-                );
-
-            string secondPassword = AnsiConsole.Prompt(
-                new TextPrompt<string>("\tConfirm your new [darkorange]master password[/]: ")
-                    .Secret()
-                    .ClearOnFinish(false)
-                );
-
-            if (firstPassword == secondPassword)
-            {
-                // Update the master password in the database (re-encrypt all data)
-                if (database.ChangePassword(currentPassword, firstPassword))
-                {
-                    AnsiConsole.Write('\n');
-                    AnsiConsole.MarkupLine("[green3_1]Succesfully updated master password![/]");
-                }
-                else
-                {
-                    AnsiConsole.Write('\n');
-                    AnsiConsole.MarkupLine("[red3_1]Failed to update the master password![/]");
-                }
-            }
-            else
-            {
-                AnsiConsole.Write('\n');
-                AnsiConsole.MarkupLine("[red3_1]The provided passwords do not match.[/] ");
-            }
 
             ContinuationPrompt();
         }
