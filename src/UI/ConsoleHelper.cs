@@ -1,6 +1,6 @@
 ﻿using Spectre.Console;
 
-namespace PasswordBank.Utils
+namespace PasswordBank.UI
 {
     internal class ConsoleHelper
     {

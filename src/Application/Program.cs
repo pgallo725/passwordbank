@@ -1,7 +1,7 @@
 ﻿using PasswordBank.Application;
 using PasswordBank.Cryptography;
 using PasswordBank.DataModel;
-using PasswordBank.Utils;
+using PasswordBank.UI;
 using Spectre.Console;
 
 namespace PasswordBank
@@ -20,11 +20,11 @@ namespace PasswordBank
         {
             return action switch
             {
-                MainMenuAction.View           => "[green3]View[/] the list of all stored credentials",
-                MainMenuAction.Search         => "[green3]Search[/] for an account in your stored credentials",
-                MainMenuAction.Add            => "[green3]Add[/] new account credentials to the database",
-                MainMenuAction.ChangePassword => "[green3]Change[/] your master password",
-                MainMenuAction.Quit           => "[green3]Exit[/] PasswordBank",
+                MainMenuAction.View           => $"[{ColorPalette.PRIMARY}]View[/] the list of all stored credentials",
+                MainMenuAction.Search         => $"[{ColorPalette.PRIMARY}]Search[/] for an account in your stored credentials",
+                MainMenuAction.Add            => $"[{ColorPalette.PRIMARY}]Add[/] new account credentials to the database",
+                MainMenuAction.ChangePassword => $"[{ColorPalette.PRIMARY}]Change[/] your master password",
+                MainMenuAction.Quit           => $"[{ColorPalette.PRIMARY}]Exit[/] PasswordBank",
                 _ => throw new ArgumentOutOfRangeException(nameof(action)),
             };
         }
@@ -40,10 +40,10 @@ namespace PasswordBank
         {
             return action switch
             {
-                CredentialAction.View   => "[green3]View[/] the account credentials",
-                CredentialAction.Edit   => "[green3]Edit[/] the account credentials",
-                CredentialAction.Delete => "[green3]Delete[/] the account credentials from the database",
-                CredentialAction.Cancel => "[green3]Back[/] to the list of credentials",
+                CredentialAction.View   => $"[{ColorPalette.PRIMARY}]View[/] the account credentials",
+                CredentialAction.Edit   => $"[{ColorPalette.PRIMARY}]Edit[/] the account credentials",
+                CredentialAction.Delete => $"[{ColorPalette.PRIMARY}]Delete[/] the account credentials from the database",
+                CredentialAction.Cancel => $"[{ColorPalette.PRIMARY}]Back[/] to the list of credentials",
                 _ => throw new ArgumentOutOfRangeException(nameof(action)),
             };
         }
@@ -60,7 +60,7 @@ namespace PasswordBank
         /// </summary>
         private static readonly Style HighlightStyle = new ()
         {
-            Foreground = Color.Orange1,
+            Foreground = ColorPalette.HIGHLIGHT,
             Decoration = Decoration.None
         };
 
@@ -81,20 +81,25 @@ namespace PasswordBank
         {
             // Application title
             Console.Title = "PasswordBank v1.0.0";
-            AnsiConsole.MarkupLine("""
-                [green3]
-                       _____                                           _  ____                 _    
-                      |  __ \                                         | ||  _ \               | |   
-                      | |__) |__ _  ___  ___ __      __ ___   _ __  __| || |_) |  __ _  _ __  | | __
-                      |  ___// _` |/ __|/ __|\ \ /\ / // _ \ | '__|/ _` ||  _ <  / _` || '_ \ | |/ /
-                      | |   | (_| |\__ \\__ \ \ V  V /| (_) || |  | (_| || |_) || (_| || | | ||   < 
-                      |_|    \__,_||___/|___/  \_/\_/  \___/ |_|   \__,_||____/  \__,_||_| |_||_|\_\
-                [/][darkorange3_1]
-                   Version 1.0.0                                                    developed by JackaL
-                [/][green3]
-                 ________________________________________________________________________________________
-                [/]
-                """);
+            AnsiConsole.Write(new Panel($"""
+                [{ColorPalette.PRIMARY}]
+                    _____                                           _  ____                 _    
+                   |  __ \                                         | ||  _ \               | |   
+                   | |__) |__ _  ___  ___ __      __ ___   _ __  __| || |_) |  __ _  _ __  | | __
+                   |  ___// _` |/ __|/ __|\ \ /\ / // _ \ | '__|/ _` ||  _ <  / _` || '_ \ | |/ /
+                   | |   | (_| |\__ \\__ \ \ V  V /| (_) || |  | (_| || |_) || (_| || | | ||   < 
+                   |_|    \__,_||___/|___/  \_/\_/  \___/ |_|   \__,_||____/  \__,_||_| |_||_|\_\[/]
+                [{ColorPalette.SECONDARY}]
+                Version 1.0.0                                                    developed by JackaL[/]
+
+                """)
+                .RoundedBorder()
+                .BorderColor(ColorPalette.NEUTRAL)
+                .PadLeft(2)
+                .PadRight(2)
+            );
+            AnsiConsole.Write('\n');
+
 
             // Trigger database creation workflow if 'credentials.db' file is not found
             if (!File.Exists(Database.DatabaseFilePath))
@@ -119,7 +124,7 @@ namespace PasswordBank
                     // Show the main menu
                     MainMenuAction mainAction = AnsiConsole.Prompt(
                         new SelectionPrompt<MainMenuAction>()
-                            .Title("Select one of the available [darkorange]operations[/]: ")
+                            .Title($"Select one of the available [{ColorPalette.PRIMARY}]operations[/]: ")
                             .UseConverter(MainMenuActionTextConverter)
                             .AddChoices(MainMenuAction.View,
                                         MainMenuAction.Search,
@@ -164,7 +169,7 @@ namespace PasswordBank
                                         .AddChoices(credentials)
                                         .AddCancelResult(NullCredential)
                                         .PageSize(10)
-                                        .MoreChoicesText("[grey](Use arrow keys to see more credentials)[/]")
+                                        .MoreChoicesText($"[{ColorPalette.NEUTRAL}](Use arrow keys to see more credentials)[/]")
                                         .WrapAround(true)
                                         .HighlightStyle(HighlightStyle)
                                 );
@@ -177,7 +182,7 @@ namespace PasswordBank
                                 // Show the menu to choose the action for the selected credential
                                 CredentialAction credentialAction = AnsiConsole.Prompt(
                                     new SelectionPrompt<CredentialAction>()
-                                        .Title("What do you want to do with the selected credential record?")
+                                        .Title($"Select one of the available [{ColorPalette.PRIMARY}]operations[/] for the selected credential: ")
                                         .UseConverter(CredentialActionTextConverter)
                                         .AddChoices(CredentialAction.View,
                                                     CredentialAction.Edit,
@@ -217,7 +222,7 @@ namespace PasswordBank
                 catch (Exception e)
                 {
                     // Print error message, wait for user confirmation and reset to main menu
-                    AnsiConsole.MarkupLineInterpolated($"\n[red][[ERROR]] {e.Message}[/]");
+                    AnsiConsole.MarkupLineInterpolated($"\n[{ColorPalette.ERROR}][[ERROR]] {e.Message}[/]");
                     ContinuationPrompt();
                 }
 
@@ -254,7 +259,7 @@ namespace PasswordBank
                 {
                     // Print error message and set the current input as the default value
                     // for the existing prompt, so that the user can edit in-place
-                    AnsiConsole.MarkupLineInterpolated($"[red]{errorMessage}[/]");
+                    AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}]{errorMessage}[/]");
                     prompt.DefaultValue(input);
                     Console.SetCursorPosition(column, row); // the updated prompt will cover the existing text perfectly
                 }
@@ -271,7 +276,10 @@ namespace PasswordBank
 
         private static void ContinuationPrompt()
         {
-            AnsiConsole.Markup("[grey]Press[/] [gray70 slowblink]Enter[/] [grey]to continue...[/]");
+            AnsiConsole.Markup($"[{ColorPalette.NEUTRAL}]Press[/] " +
+                $"[{ColorPalette.NEUTRAL_LIGHT} slowblink]Enter[/] " +
+                $"[{ColorPalette.NEUTRAL}]to continue...[/]");
+
             ConsoleHelper.WaitForEnterKey();
         }
 
@@ -279,7 +287,7 @@ namespace PasswordBank
         private static string AuthenticationPrompt()
         {
             // Action title
-            AnsiConsole.Markup("[grey]>> AUTHENTICATION[/]");
+            AnsiConsole.Markup($"[{ColorPalette.NEUTRAL}]>> AUTHENTICATION[/]");
 
             ConsoleHelper.SaveCheckpoint();
 
@@ -287,7 +295,7 @@ namespace PasswordBank
             AnsiConsole.Write('\n');
 
             string password = AnsiConsole.Prompt(
-                new TextPrompt<string>("Insert your [slowblink darkorange]master password[/]: ")
+                new TextPrompt<string>($"Insert your [{ColorPalette.SECONDARY} slowblink]master password[/]: ")
                     .Secret()
                     .ClearOnFinish(false)
                 );
@@ -301,12 +309,12 @@ namespace PasswordBank
             // Check the password against the key stored in the database
             if (database is null || !database.VerifyPassword(password))
             {
-                AnsiConsole.MarkupLine(" [red]FAILED[/]");
+                AnsiConsole.MarkupLine($" [{ColorPalette.ERROR}]FAILED[/]");
                 return string.Empty;
             }
             else
             {
-                AnsiConsole.MarkupLine(" [green3]SUCCESSFUL[/]");
+                AnsiConsole.MarkupLine($" [{ColorPalette.PRIMARY}]SUCCESSFUL[/]");
                 return password;
             }
         }
@@ -314,21 +322,21 @@ namespace PasswordBank
 
         private static bool Action_CreateDatabase()
         {
-            AnsiConsole.MarkupLine("Welcome to [green3]PasswordBank[/]!");
-            AnsiConsole.MarkupLine("No [italic]credentials.db[/] file detected, [slowblink]initializing new database...[/]\n");
+            AnsiConsole.MarkupLine($"Welcome to [{ColorPalette.PRIMARY}]PasswordBank[/]!");
+            AnsiConsole.MarkupLine($"No [italic]credentials.db[/] file detected, [slowblink]initializing new database...[/]\n");
 
             // Repeat the following block until the user provides matching passwords
             ConsoleHelper.SaveCheckpoint();
             while (true)
             {
                 string firstPassword = AnsiConsole.Prompt(
-                    new TextPrompt<string>("Choose your [darkorange]master password[/]: ")
+                    new TextPrompt<string>($"Choose your [{ColorPalette.SECONDARY}]master password[/]: ")
                         .Secret()
                         .ClearOnFinish(false)
                     );
 
                 string secondPassword = AnsiConsole.Prompt(
-                    new TextPrompt<string>("Confirm your [darkorange]master password[/]: ")
+                    new TextPrompt<string>($"Confirm your [{ColorPalette.SECONDARY}]master password[/]: ")
                         .Secret()
                         .ClearOnFinish(false)
                     );
@@ -341,13 +349,13 @@ namespace PasswordBank
                         Database.Create(firstPassword);
 
                         AnsiConsole.Write('\n');
-                        AnsiConsole.MarkupLine("[green3_1]Succesfully created credentials database![/]");
+                        AnsiConsole.MarkupLine($"[{ColorPalette.SUCCESS}]Succesfully created credentials database![/]");
                         result = true;
                     }
                     catch (Exception e)
                     {
                         AnsiConsole.WriteLine(e.Message);
-                        AnsiConsole.MarkupLine("[red]Failed to create credentials database![/]");
+                        AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]Failed to create credentials database![/]");
                         result = false;
                     }
 
@@ -358,7 +366,7 @@ namespace PasswordBank
                 else
                 {
                     AnsiConsole.Write('\n');
-                    AnsiConsole.MarkupLine("[red]The provided passwords do not match, please retry.[/]");
+                    AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]The provided passwords do not match, please retry.[/]");
 
                     ContinuationPrompt();
                     ConsoleHelper.RestoreCheckpoint();
@@ -370,7 +378,7 @@ namespace PasswordBank
         private static void Action_ChangeMasterPassword()
         {
             // Action title
-            AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]CHANGE MASTER PASSWORD[/]");
+            AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]CHANGE MASTER PASSWORD[/]");
 
             // Authenticate the user and load the database
             string currentPassword = AuthenticationPrompt();
@@ -383,13 +391,13 @@ namespace PasswordBank
             }
 
             string firstPassword = AnsiConsole.Prompt(
-                new TextPrompt<string>("Choose your new [darkorange]master password[/]: ")
+                new TextPrompt<string>($"Choose your new [{ColorPalette.SECONDARY}]master password[/]: ")
                     .Secret()
                     .ClearOnFinish(false)
                 );
 
             string secondPassword = AnsiConsole.Prompt(
-                new TextPrompt<string>("\tConfirm your new [darkorange]master password[/]: ")
+                new TextPrompt<string>($"Confirm your new [{ColorPalette.SECONDARY}]master password[/]: ")
                     .Secret()
                     .ClearOnFinish(false)
                 );
@@ -400,18 +408,18 @@ namespace PasswordBank
                 if (database.ChangePassword(currentPassword, firstPassword))
                 {
                     AnsiConsole.Write('\n');
-                    AnsiConsole.MarkupLine("[green3_1]Succesfully updated master password![/]");
+                    AnsiConsole.MarkupLine($"[{ColorPalette.SUCCESS}]Succesfully updated master password![/]");
                 }
                 else
                 {
                     AnsiConsole.Write('\n');
-                    AnsiConsole.MarkupLine("[red3_1]Failed to update the master password![/]");
+                    AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]Failed to update the master password![/]");
                 }
             }
             else
             {
                 AnsiConsole.Write('\n');
-                AnsiConsole.MarkupLine("[red3_1]The provided passwords do not match.[/] ");
+                AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]The provided passwords do not match.[/] ");
             }
 
             ContinuationPrompt();
@@ -421,7 +429,7 @@ namespace PasswordBank
         private static List<EncryptedCredential>? Action_ListCredentials()
         {
             // Action title
-            AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]VIEW CREDENTIALS[/]");
+            AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]VIEW CREDENTIALS[/]");
 
             // Authenticate the user
             string masterPassword = AuthenticationPrompt();
@@ -443,7 +451,7 @@ namespace PasswordBank
         private static List<EncryptedCredential>? Action_SearchCredentials()
         {
             // Action title
-            AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]SEARCH CREDENTIALS[/]");
+            AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]SEARCH CREDENTIALS[/]");
 
             // Authenticate the user
             string masterPassword = AuthenticationPrompt();
@@ -457,7 +465,7 @@ namespace PasswordBank
 
             // Get the search string from user input
             string searchString = AnsiConsole.Prompt(
-                new TextPrompt<string>("[orange1]Search[/]:")
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}]Search[/] for:")
                     .ClearOnFinish(true)
                 );
 
@@ -471,7 +479,7 @@ namespace PasswordBank
         private static void Action_ViewCredential(EncryptedCredential credential)
         {
             // Action title
-            AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]VIEW CREDENTIAL INFORMATION[/]");
+            AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]VIEW CREDENTIAL INFORMATION[/]");
 
             // Authenticate the user
             string masterPassword = AuthenticationPrompt();
@@ -491,14 +499,14 @@ namespace PasswordBank
             CredentialInfo credentialInfo = credential.Decrypt(key);
 
             Table table = new();
-            table.Title("[green3 bold]Credential Information[/]");
+            table.Title($"[{ColorPalette.PRIMARY} bold]Credential Information[/]");
             table.Border(TableBorder.Heavy);
             table.AddColumn("Key", c => c.Alignment(Justify.Right));
             table.AddColumn("Value", c => c.Alignment(Justify.Center));
-            table.AddRow("[darkorange3]Website/Service[/]", credentialInfo.Name);
-            table.AddRow("[darkorange3]Email Address[/]", credentialInfo.EmailAddress ?? string.Empty);
-            table.AddRow("[darkorange3]Username[/]", credentialInfo.Username ?? string.Empty);
-            table.AddRow("[darkorange3]Password[/]", credentialInfo.Password);
+            table.AddRow($"[{ColorPalette.SECONDARY}]Website/Service[/]", credentialInfo.Name);
+            table.AddRow($"[{ColorPalette.SECONDARY}]Email Address[/]", credentialInfo.EmailAddress ?? string.Empty);
+            table.AddRow($"[{ColorPalette.SECONDARY}]Username[/]", credentialInfo.Username ?? string.Empty);
+            table.AddRow($"[{ColorPalette.SECONDARY}]Password[/]", credentialInfo.Password);
             table.HideHeaders();
             table.ShowRowSeparators();
 
@@ -512,7 +520,7 @@ namespace PasswordBank
         private static void Action_AddCredential()
         {
             // Action title
-            AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]ADD ACCOUNT[/]");
+            AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]ADD ACCOUNT[/]");
 
             // Authenticate the user and load the database
             string masterPassword = AuthenticationPrompt();
@@ -528,26 +536,26 @@ namespace PasswordBank
             AnsiConsole.Write('\n');
 
             string accountName = ValidatedTextPrompt(
-                new TextPrompt<string>("[darkorange3] - Website/Service:[/]")
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Website/Service:[/]")
                     .ClearOnFinish(false),
                 new AccountNameValidator(database)
                 );
 
             string emailAddress = ValidatedTextPrompt(
-                new TextPrompt<string>("[darkorange3] - Email Address:[/]")
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Email Address:[/]")
                     .AllowEmpty()
                     .ClearOnFinish(false),
                 new EmailAddressValidator()
                 );
 
             string username = AnsiConsole.Prompt(
-                new TextPrompt<string>("[darkorange3] - Username:[/]")
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Username:[/]")
                     .AllowEmpty()
                     .ClearOnFinish(false)
                 );
 
             string password = AnsiConsole.Prompt(
-                new TextPrompt<string>("[darkorange3] - Password:[/]")
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Password:[/]")
                     .Secret()
                     .ClearOnFinish(false)
                 );
@@ -567,8 +575,8 @@ namespace PasswordBank
             var credential = credentialInfo.Encrypt(encryptionKey);
 
             if (database.Insert(credential))
-                AnsiConsole.MarkupLine("\n[green3_1]Credentials succesfully added to the database![/]");
-            else AnsiConsole.MarkupLine("\n[red]Failed to add the credentials to the database[/]");
+                AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Credentials succesfully added to the database![/]");
+            else AnsiConsole.MarkupLine($"\n[{ColorPalette.ERROR}]Failed to add the credentials to the database[/]");
 
             ContinuationPrompt();
         }
@@ -577,7 +585,7 @@ namespace PasswordBank
         private static void Action_EditCredential(EncryptedCredential credential)
         {
             // Action title
-            AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]EDIT CREDENTIAL[/]");
+            AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]EDIT CREDENTIAL[/]");
 
             // Authenticate the user
             string masterPassword = AuthenticationPrompt();
@@ -599,7 +607,7 @@ namespace PasswordBank
             var credentialInfo = credential.Decrypt(encryptionKey);
 
             string accountName = ValidatedTextPrompt(
-                new TextPrompt<string>("[darkorange3] - Website/Service:[/]")
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Website/Service:[/]")
                     .DefaultValue(credentialInfo.Name)
                     .EditableDefaultValue(true)
                     .HideDefaultValue()
@@ -608,7 +616,7 @@ namespace PasswordBank
                 );
 
             string emailAddress = ValidatedTextPrompt(
-                new TextPrompt<string>("[darkorange3] - Email Address:[/]")
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Email Address:[/]")
                     .DefaultValue(credentialInfo.EmailAddress ?? string.Empty)
                     .EditableDefaultValue(true)
                     .HideDefaultValue()
@@ -618,7 +626,7 @@ namespace PasswordBank
                 );
 
             string username = AnsiConsole.Prompt(
-                new TextPrompt<string>("[darkorange3] - Username:[/]")
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Username:[/]")
                     .DefaultValue(credentialInfo.Username ?? string.Empty)
                     .EditableDefaultValue(true)
                     .HideDefaultValue()
@@ -627,7 +635,7 @@ namespace PasswordBank
                 );
 
             string password = AnsiConsole.Prompt(
-                new TextPrompt<string>("[darkorange3] - Password:[/]")
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Password:[/]")
                     .Secret()
                     .DefaultValue(credentialInfo.Password)
                     .EditableDefaultValue(true)
@@ -648,7 +656,7 @@ namespace PasswordBank
 
             if (database.Update(credential, updatedCredential))
             {
-                AnsiConsole.MarkupLine("\n[green3_1]Credentials succesfully updated in the database![/]");
+                AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Credentials succesfully updated in the database![/]");
 
                 // Update to the new credential information in-memory
                 credential.Name = updatedCredential.Name;
@@ -657,7 +665,7 @@ namespace PasswordBank
                 credential.EncryptionIV = updatedCredential.EncryptionIV;
                 credential.EncryptedPassword = updatedCredential.EncryptedPassword;
             }
-            else AnsiConsole.MarkupLine("\n[red]Failed to update the credentials in the database[/]");
+            else AnsiConsole.MarkupLine($"\n[{ColorPalette.ERROR}]Failed to update the credentials in the database[/]");
 
             ContinuationPrompt();
         }
@@ -666,7 +674,7 @@ namespace PasswordBank
         private static void Action_DeleteCredential(EncryptedCredential credential, List<EncryptedCredential> credentials)
         {
             // Action title
-            AnsiConsole.MarkupLine("[grey]>> OPERATION[/] [green3]DELETE CREDENTIAL[/]");
+            AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]DELETE CREDENTIAL[/]");
 
             // Authenticate the user
             string masterPassword = AuthenticationPrompt();
@@ -680,12 +688,12 @@ namespace PasswordBank
 
             if (database.Remove(credential))
             {
-                AnsiConsole.MarkupLine("[green3_1]Credentials succesfully removed from the database![/]");
+                AnsiConsole.MarkupLine($"[{ColorPalette.SUCCESS}]Credentials succesfully removed from the database![/]");
 
                 // Remove the deleted credential from the in-memory list
                 credentials.Remove(credential);
             }
-            else AnsiConsole.MarkupLine("[red]Failed to remove the credentials from the database[/]");
+            else AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]Failed to remove the credentials from the database[/]");
 
             ContinuationPrompt();
         }
