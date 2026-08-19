@@ -45,7 +45,7 @@ namespace PasswordBank.Application
     /// <param name="database">A reference to the credentials database.</param>
     internal class AccountNameValidator(Database? database) : IValidator
     {
-        public (bool, string?) Validate(string accountName)
+        public virtual (bool, string?) Validate(string accountName)
         {
             // Check if the account name is not empty and doesn't already exist in the database
             if (string.IsNullOrWhiteSpace(accountName))
@@ -69,7 +69,7 @@ namespace PasswordBank.Application
     internal class AccountNameEditValidator(Database? database, CredentialInfo currentInfo)
         : AccountNameValidator(database)
     {
-        public new (bool, string?) Validate(string accountName)
+        public override (bool, string?) Validate(string accountName)
         {
             if (string.Compare(accountName, currentInfo.Name, StringComparison.OrdinalIgnoreCase) == 0)
                 return (true, string.Empty);
