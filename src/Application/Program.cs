@@ -226,6 +226,11 @@ namespace PasswordBank
                     ContinuationPrompt();
                 }
 
+                // Close any open database connection, because the user is
+                //  unauthenticated while on the application's main menu
+                database?.Dispose();
+                database = null;
+
                 // Clear everything before showing the main menu again
                 ConsoleHelper.RestoreCheckpoint();
             }
@@ -346,7 +351,9 @@ namespace PasswordBank
                     bool result;
                     try
                     {
-                        Database.Create(firstPassword);
+                        // NOTE: do not store the database object because we don't want to keep
+                        //  an open connection while we're on the application main menu (unauthenticated)
+                        _ = Database.Create(firstPassword);
 
                         AnsiConsole.Write('\n');
                         AnsiConsole.MarkupLine($"[{ColorPalette.SUCCESS}]Succesfully created credentials database![/]");

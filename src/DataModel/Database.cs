@@ -6,9 +6,13 @@ namespace PasswordBank.DataModel
     internal class Database : IDisposable
     {
         /// <summary>
-        /// The (static) path of the credentials database file.
+        /// The (static) path to the credentials database file.
         /// </summary>
-        public const string DatabaseFilePath = "credentials.db";
+        public static readonly string DatabaseFilePath = Path.Combine
+        (
+            AppDomain.CurrentDomain.BaseDirectory,  // directory where the application's .exe is located
+            "credentials.db"                        // fixed name of the credentials database file
+        );
 
 
         private readonly SqliteConnection connection;
@@ -29,7 +33,7 @@ namespace PasswordBank.DataModel
         /// </summary>
         /// <param name="password">The password to use for encrypting the database.</param>
         /// <exception cref="ApplicationException"></exception>
-        public static Database? Create(string password)
+        public static Database Create(string password)
         {
             if (File.Exists(DatabaseFilePath))
                 throw new ApplicationException("Database file already exists.");
@@ -110,11 +114,12 @@ namespace PasswordBank.DataModel
             {
                 database.connection?.Dispose();
 
-                // Delete the database file that we failed to initialize
                 if (File.Exists(DatabaseFilePath))
+                {
+                    // Delete the database file that we failed to initialize
                     File.Delete(DatabaseFilePath);
-
-                return null;
+                }
+                throw;
             }
         }
 
@@ -135,7 +140,7 @@ namespace PasswordBank.DataModel
                 DataSource = DatabaseFilePath,
                 Password = password
             };
-            Database database = new( new SqliteConnection(builder.ConnectionString) );
+            var database = new Database(new SqliteConnection(builder.ConnectionString));
 
             try
             {
@@ -166,16 +171,18 @@ namespace PasswordBank.DataModel
             }
             catch (Exception e)
             {
-                // NOTE: when the provided password is wrong, SQLite responds with error 26: 'file is not a database'
-                //  We don't have a proper way to distinguish the case of a wrong password from the other cases
-                //  where the same error is thrown, so we just consider them all as password errors.
-                if (e.Message.StartsWith("SQLite Error 26"))
-                    return null;
-                else
+                database.connection?.Dispose();
+
+                if (e is SqliteException sqle)
                 {
-                    database.connection?.Dispose();
-                    throw;
+                    // NOTE: when the provided password is wrong, SQLite responds with error 26: 'file is not a database'.
+                    //  We don't have a proper way to distinguish the case of a wrong password from the other cases
+                    //  when the same error is thrown, so we just consider them all as password errors and we return
+                    //  gracefully instead of throwing an exception.
+                    if (sqle.SqliteErrorCode == 26)
+                        return null;
                 }
+                throw;
             }
         }
 
@@ -226,7 +233,7 @@ namespace PasswordBank.DataModel
         {
             using var command = connection.CreateCommand();
             command.CommandText = """
-                SELECT *
+                SELECT Name, Value
                 FROM ServiceData
                 WHERE Name = 'MasterPasswordHash' OR Name = 'VerificationSalt';
                 """;
@@ -284,7 +291,7 @@ namespace PasswordBank.DataModel
         {
             using var command = connection.CreateCommand();
             command.CommandText = """
-                SELECT *
+                SELECT AccountName, EmailAddress, Username, Password, CryptoIV
                 FROM Credentials;
                 """;
             using var reader = command.ExecuteReader();
@@ -314,25 +321,26 @@ namespace PasswordBank.DataModel
 
 
         /// <summary>
-        /// Search among the database for credentials whose account name or email address
-        /// matches (even partially) with the provided search string.
+        /// Search among the database for credentials whose account name or email address matches<br/>
+        /// with the provided search string (partial matches supported on the account name field).
         /// </summary>
         /// <param name="searchString">The string used for searching credential records.</param>
-        /// <param name="maxRecords">The maximum number of possible matches returned by this function.</param>
+        /// <param name="maxResults">The maximum number of possible matches returned by this function.</param>
         /// <returns>A limited list of records matching the search string.</returns>
         public List<EncryptedCredential> Search(string searchString, int maxResults = 100)
         {
+            if (maxResults <= 0)
+                return [];
+
             using var command = connection.CreateCommand();
             command.CommandText = """
-                SELECT *
+                SELECT AccountName, EmailAddress, Username, Password, CryptoIV
                 FROM Credentials;
-                WHERE AccountName LIKE $searchString
                 """;
-            command.Parameters.AddWithValue("$searchString", searchString);
             using var reader = command.ExecuteReader();
 
             var entries = new List<EncryptedCredential>(maxResults);
-            while (reader.Read())
+            while (entries.Count < maxResults && reader.Read())
             {
                 string accountName = reader.GetString(0);
                 string? emailAddress = reader.IsDBNull(1) ? null : reader.GetString(1);
@@ -355,9 +363,6 @@ namespace PasswordBank.DataModel
                         EncryptionIV = encryptionIV
                     };
                     entries.Add(credential);
-
-                    if (entries.Count >= maxResults)
-                        break;
                 }
             }
             return entries;
