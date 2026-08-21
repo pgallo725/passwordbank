@@ -152,19 +152,48 @@ namespace PasswordBank.DataModel
                 command.CommandText = """
                     SELECT COUNT(*)
                     FROM sqlite_schema
-                    WHERE type='table' AND name='Credentials';
+                    WHERE type='table' AND name IN ('Credentials', 'ServiceData');
                     """;
-                long found = (long)(command.ExecuteScalar() ?? 0);
+                long found = (long)(command.ExecuteScalar() ?? 0);  // should return 2
 
-                command = database.connection.CreateCommand();
-                command.CommandText = """
-                    SELECT COUNT(*)
-                    FROM sqlite_schema
-                    WHERE type='table' AND name='ServiceData';
-                    """;
-                found += (long)(command.ExecuteScalar() ?? 0);
+                // Validate the schema of these tables
+                if (found == 2)
+                {
+                    command = database.connection.CreateCommand();
+                    command.CommandText = """
+                        SELECT COUNT(*)
+                        FROM pragma_table_info('Credentials')
+                        WHERE (name='AccountName' AND type='TEXT' AND pk=1)
+                           OR (name='EmailAddress' AND type='TEXT')
+                           OR (name='Username' AND type='TEXT')
+                           OR (name='Password' AND type='BLOB')
+                           OR (name='CryptoIV' AND type='BLOB');
+                        """;
+                    found += (long)(command.ExecuteScalar() ?? 0);  // should return 5
 
-                if (found != 2)
+                    command = database.connection.CreateCommand();
+                    command.CommandText = """
+                        SELECT COUNT(*)
+                        FROM pragma_table_info('ServiceData')
+                        WHERE (name='Name' AND type='TEXT' AND pk=1)
+                           OR (name='Value' AND type='BLOB');
+                        """;
+                    found += (long)(command.ExecuteScalar() ?? 0);  // should return 2
+                }
+
+                // Validate the content of the ServiceData table
+                if (found == 9)
+                {
+                    command = database.connection.CreateCommand();
+                    command.CommandText = """
+                        SELECT COUNT(*)
+                        FROM ServiceData
+                        WHERE Name IN ('VerificationSalt', 'EncryptionSalt', 'MasterPasswordHash');
+                        """;
+                    found += (long)(command.ExecuteScalar() ?? 0);  // should return 3
+                }
+
+                if (found != 12)
                     throw new ApplicationException("Invalid database schema.");
 
                 return database;
