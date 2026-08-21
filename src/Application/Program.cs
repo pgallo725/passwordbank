@@ -164,7 +164,7 @@ namespace PasswordBank
                                 // Display the list of credentials and let the user select one
                                 EncryptedCredential credential = AnsiConsole.Prompt(
                                     new SelectionPrompt<EncryptedCredential>()
-                                        .Title("Select one of the following credential records to access further options:")
+                                        .Title("Select a credential record to access further options:")
                                         .UseConverter(c => c.Name)
                                         .AddChoices(credentials)
                                         .AddCancelResult(NullCredential)
