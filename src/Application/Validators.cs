@@ -71,7 +71,7 @@ namespace PasswordBank.Application
     {
         public override (bool, string?) Validate(string accountName)
         {
-            if (string.Compare(accountName, currentInfo.Name, StringComparison.OrdinalIgnoreCase) == 0)
+            if (string.Compare(accountName, currentInfo.Name, StringComparison.Ordinal) == 0)
                 return (true, string.Empty);
             else return base.Validate(accountName);
         }
