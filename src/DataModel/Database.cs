@@ -112,7 +112,7 @@ namespace PasswordBank.DataModel
             }
             catch (Exception)
             {
-                database.connection?.Dispose();
+                database.Dispose();
 
                 if (File.Exists(DatabaseFilePath))
                 {
@@ -171,7 +171,7 @@ namespace PasswordBank.DataModel
             }
             catch (Exception e)
             {
-                database.connection?.Dispose();
+                database.Dispose();
 
                 if (e is SqliteException sqle)
                 {
@@ -463,19 +463,6 @@ namespace PasswordBank.DataModel
         /// <returns>A boolean value indicating whether the operation succeeded or not.</returns>
         public bool ChangePassword(string oldPassword, string newPassword)
         {
-            // NOTE: SQLite doesn't support parameters in PRAGMA statements.
-            //  Instead, we use the quote() function to prevent SQL injection.
-            using var pragma = connection.CreateCommand();
-            pragma.CommandText = "SELECT quote($newPassword);";
-            pragma.Parameters.AddWithValue("$newPassword", newPassword);
-            if (pragma.ExecuteScalar() is string quotedNewPassword)
-            {
-                pragma.CommandText = $"PRAGMA rekey = {quotedNewPassword}";
-                pragma.Parameters.Clear();
-                pragma.ExecuteNonQuery();
-            }
-            else return false;
-
             List<EncryptedCredential> credentials = GetCredentials();
 
             // NOTE: the whole set of database updates required for a password change
@@ -497,46 +484,62 @@ namespace PasswordBank.DataModel
             byte[] newEncryptionKey = PBKDF2.GenerateKey(newPassword, encryptionSalt);
             byte[] newPasswordHash = PBKDF2.GenerateKey(newPassword, verificationSalt);
 
-            // Loop over all credentials in the database and re-encrypt them with the new key
-            int updated = 0;
-            foreach (EncryptedCredential credential in credentials)
+            try
             {
-                string password = AES256.Decrypt(credential.EncryptedPassword, oldEncryptionKey, credential.EncryptionIV);
-                byte[] encryptedPassword = AES256.Encrypt(password, newEncryptionKey, credential.EncryptionIV);
+                // Loop over all credentials in the database and re-encrypt them with the new key
+                int updated = 0;
+                foreach (EncryptedCredential credential in credentials)
+                {
+                    string password = AES256.Decrypt(credential.EncryptedPassword, oldEncryptionKey, credential.EncryptionIV);
+                    byte[] encryptedPassword = AES256.Encrypt(password, newEncryptionKey, credential.EncryptionIV);
 
-                command.Parameters[0].Value = encryptedPassword;
-                command.Parameters[1].Value = credential.Name;
+                    command.Parameters[0].Value = encryptedPassword;
+                    command.Parameters[1].Value = credential.Name;
+                    updated += command.ExecuteNonQuery();
+                }
+
+                // Update the master password hash in the ServiceData table
+                command.Parameters.Clear();
+                command.CommandText = """
+                    UPDATE ServiceData
+                    SET Value = $hash
+                    WHERE Name = 'MasterPasswordHash';
+                    """;
+                command.Parameters.AddWithValue("$hash", newPasswordHash);
                 updated += command.ExecuteNonQuery();
+
+                if (updated != credentials.Count + 1 /* for the password hash */)
+                {
+                    transaction.Rollback();
+                    return false;
+                }
+                else // finally, change the SQLite encryption key and password as well
+                {
+                    // NOTE: SQLite doesn't support parameters in PRAGMA statements.
+                    //  Instead, we use the quote() function to prevent SQL injection.
+                    using var pragma = connection.CreateCommand();
+                    pragma.CommandText = "SELECT quote($newPassword);";
+                    pragma.Parameters.AddWithValue("$newPassword", newPassword);
+                    if (pragma.ExecuteScalar() is string quotedNewPassword)
+                    {
+                        pragma.CommandText = $"PRAGMA rekey = {quotedNewPassword}";
+                        pragma.Parameters.Clear();
+                        pragma.ExecuteNonQuery();
+                    }
+                    else
+                    {
+                        transaction.Rollback();
+                        return false;
+                    }
+                }
+                transaction.Commit();
+                return true;
             }
-
-            // Update the master password hash in the ServiceData table
-            command.Parameters.Clear();
-            command.CommandText = """
-                UPDATE ServiceData
-                SET Value = $hash
-                WHERE Name = 'MasterPasswordHash';
-                """;
-            command.Parameters.AddWithValue("$hash", newPasswordHash);
-            updated += command.ExecuteNonQuery();
-
-            if (updated != credentials.Count + 1 /* for the password hash */)
+            catch (Exception)
             {
                 transaction.Rollback();
-
-                // Also, rollback the database encryption to the old password
-                pragma.CommandText = "SELECT quote($oldPassword);";
-                pragma.Parameters.AddWithValue("$oldPassword", oldPassword);
-                if (pragma.ExecuteScalar() is string quotedOldPassword)
-                {
-                    pragma.CommandText = $"PRAGMA rekey = {quotedOldPassword}";
-                    pragma.Parameters.Clear();
-                    pragma.ExecuteNonQuery();
-                }
                 return false;
             }
-
-            transaction.Commit();
-            return true;
         }
     }
 }
