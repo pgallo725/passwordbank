@@ -78,9 +78,20 @@ namespace PasswordBank.DataModel
                 byte[] verificationSalt = Cryptography.Random.GenerateBytes(16);
                 byte[] encryptionSalt = Cryptography.Random.GenerateBytes(16);
                 byte[] masterPasswordHash = PBKDF2.GenerateKey(password, verificationSalt);
+                byte[] databaseVersion = BitConverter.GetBytes(1);
+                if (!BitConverter.IsLittleEndian)
+                    Array.Reverse(databaseVersion); // make sure byte sequence is little endian
 
                 // Insert these values into the ServiceData table
                 int added = 0;
+                command = database.connection.CreateCommand();
+                command.CommandText = """
+                    INSERT INTO ServiceData
+                    VALUES('DatabaseVersion', $value);
+                    """;
+                command.Parameters.AddWithValue("$value", databaseVersion);
+                added += command.ExecuteNonQuery();
+
                 command = database.connection.CreateCommand();
                 command.CommandText = """
                     INSERT INTO ServiceData
@@ -105,7 +116,7 @@ namespace PasswordBank.DataModel
                 command.Parameters.AddWithValue("$value", masterPasswordHash);
                 added += command.ExecuteNonQuery();
 
-                if (added != 3)
+                if (added != 4)
                     throw new ApplicationException("Failed to initialize SQL tables in the database.");
 
                 return database;
@@ -188,12 +199,33 @@ namespace PasswordBank.DataModel
                     command.CommandText = """
                         SELECT COUNT(*)
                         FROM ServiceData
-                        WHERE Name IN ('VerificationSalt', 'EncryptionSalt', 'MasterPasswordHash');
+                        WHERE Name IN ('DatabaseVersion', 'VerificationSalt', 'EncryptionSalt', 'MasterPasswordHash');
                         """;
-                    found += (long)(command.ExecuteScalar() ?? 0);  // should return 3
+                    found += (long)(command.ExecuteScalar() ?? 0);  // should return 4
                 }
 
-                if (found != 12)
+                // Validate the database version number
+                int version = 0;
+                if (found == 13)
+                {
+                    command = database.connection.CreateCommand();
+                    command.CommandText = """
+                        SELECT Value
+                        FROM ServiceData
+                        WHERE Name='DatabaseVersion';
+                        """;
+                    using var reader = command.ExecuteReader();
+
+                    if (reader.Read())
+                    {
+                        byte[] versionBytes = reader.GetFieldValue<byte[]>(0);
+                        if (!BitConverter.IsLittleEndian)
+                            Array.Reverse(versionBytes);
+                        version = BitConverter.ToInt32(versionBytes);
+                    }
+                }
+
+                if (found != 13 || version != 1)
                     throw new ApplicationException("Invalid database schema.");
 
                 return database;
