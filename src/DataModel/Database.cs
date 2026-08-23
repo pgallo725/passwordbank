@@ -38,6 +38,8 @@ namespace PasswordBank.DataModel
             if (File.Exists(DatabaseFilePath))
                 throw new ApplicationException("Database file already exists.");
 
+            ArgumentException.ThrowIfNullOrEmpty(password);
+
             var builder = new SqliteConnectionStringBuilder
             {
                 DataSource = DatabaseFilePath,
@@ -145,6 +147,8 @@ namespace PasswordBank.DataModel
         {
             if (!File.Exists(DatabaseFilePath))
                 throw new ApplicationException("Database file not found.");
+
+            ArgumentException.ThrowIfNullOrEmpty(password);
 
             var builder = new SqliteConnectionStringBuilder
             {
@@ -292,6 +296,8 @@ namespace PasswordBank.DataModel
         /// <returns>A boolean value indicating whether the password passed the verification or not.</returns>
         public bool VerifyPassword(string password)
         {
+            ArgumentException.ThrowIfNullOrEmpty(password);
+
             using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT Name, Value
@@ -390,8 +396,8 @@ namespace PasswordBank.DataModel
         /// <returns>A limited list of records matching the search string.</returns>
         public List<EncryptedCredential> Search(string searchString, int maxResults = 100)
         {
-            if (maxResults <= 0)
-                return [];
+            ArgumentException.ThrowIfNullOrEmpty(searchString);
+            ArgumentOutOfRangeException.ThrowIfNegative(maxResults);
 
             using var command = connection.CreateCommand();
             command.CommandText = """
@@ -437,6 +443,8 @@ namespace PasswordBank.DataModel
         /// <returns>A boolean value indicating whether the database contains an account with the given name.</returns>
         public bool Contains(string accountName)
         {
+            ArgumentException.ThrowIfNullOrEmpty(accountName);
+
             using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT COUNT(*)
@@ -524,6 +532,9 @@ namespace PasswordBank.DataModel
         /// <returns>A boolean value indicating whether the operation succeeded or not.</returns>
         public bool ChangePassword(string oldPassword, string newPassword)
         {
+            ArgumentException.ThrowIfNullOrEmpty(oldPassword);
+            ArgumentException.ThrowIfNullOrEmpty(newPassword);
+
             List<EncryptedCredential> credentials = GetCredentials();
 
             // NOTE: the whole set of database updates required for a password change
