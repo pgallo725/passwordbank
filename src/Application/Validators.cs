@@ -1,4 +1,5 @@
 ﻿using PasswordBank.DataModel;
+using System.Buffers;
 using System.Net.Mail;
 
 namespace PasswordBank.Application
@@ -25,6 +26,20 @@ namespace PasswordBank.Application
 
 
     /// <summary>
+    /// Implements basic validation, only checking the input length against the maximum value.
+    /// </summary>
+    internal class BasicValidator : IValidator
+    {
+        public (bool, string?) Validate(string value)
+        {
+            if (value.Length > 256)
+                return (false, "The input length is limited to a maximum of 256 characters.");
+            return (true, string.Empty);
+        }
+    }
+
+
+    /// <summary>
     /// Implements validation of a string input that should represent an email address.
     /// </summary>
     internal class EmailAddressValidator : IValidator
@@ -32,7 +47,9 @@ namespace PasswordBank.Application
         public (bool, string?) Validate(string emailAddress)
         {
             // Consider an email address correct if it can be used to construct a valid MailAddress object
-            if (MailAddress.TryCreate(emailAddress, out var _))
+            if (emailAddress.Length > 256)
+                return (false, "The input length is limited to a maximum of 256 characters.");
+            else if (MailAddress.TryCreate(emailAddress, out var _))
                 return (true, string.Empty);
             else return (false, "The input does not match the format of a valid email address.");
         }
@@ -47,10 +64,12 @@ namespace PasswordBank.Application
     {
         public virtual (bool, string?) Validate(string accountName)
         {
-            // Check if the account name is not empty and doesn't already exist in the database
+            // Check that the account name is not empty and doesn't already exist in the database
             if (string.IsNullOrWhiteSpace(accountName))
                 return (false, "The account name must contain atleast 1 non-whitespace character.");
-            if (database is null)
+            else if (accountName.Length > 256)
+                return (false, "The input length is limited to a maximum of 256 characters.");
+            else if (database is null)
                 return (false, "Cannot access the database for checking the username.");
             else if (database.Contains(accountName))
                 return (false, "An account with the same name already exists in the database.");
@@ -74,6 +93,72 @@ namespace PasswordBank.Application
             if (string.Compare(accountName, currentInfo.Name, StringComparison.Ordinal) == 0)
                 return (true, string.Empty);
             else return base.Validate(accountName);
+        }
+    }
+
+
+    /// <summary>
+    /// Implements validation of a string input that represents an account's password.
+    /// </summary>
+    internal class PasswordValidator : IValidator
+    {
+        public (bool, string?) Validate(string password)
+        {
+            // Check that the password is not empty/whitespace and contains atleast 3 characters
+            if (string.IsNullOrWhiteSpace(password))
+                return (false, "A password must not be empty or made only of whitespace characters.");
+            else if (password.Length > 256)
+                return (false, "The input length is limited to a maximum of 256 characters.");
+            else if (password.Length < 3)
+                return (false, "A password must contain at least 3 characters.");
+            else return (true, string.Empty);
+        }
+    }
+
+
+    /// <summary>
+    /// Implements validation of a string input that will be used as the database's master password.<br/>
+    /// In addition to basic validity checks, this also makes sure that the master password satisfies
+    ///  a set of minimum strength requirements.
+    /// </summary>
+    internal class MasterPasswordValidator : IValidator
+    {
+        private static readonly SearchValues<char> digits = SearchValues.Create
+        (
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+        );
+        private static readonly SearchValues<char> lowercase = SearchValues.Create
+        (
+            ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+             'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
+        );
+        private static readonly SearchValues<char> uppercase = SearchValues.Create
+        (
+            ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+             'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+        );
+
+        public (bool, string?) Validate(string masterPassword)
+        {
+            /* Check that the master password satisfies the following password strength requirements:
+             *  - At least 8 characters long
+             *  - At least 1 lowercase letter
+             *  - At least 1 uppercase letter
+             *  - At least 1 digit character
+             */
+            if (string.IsNullOrWhiteSpace(masterPassword))
+                return (false, "A password must not be empty or made only of whitespace characters.");
+            else if (masterPassword.Length > 256)
+                return (false, "The input length is limited to a maximum of 256 characters.");
+            else if (masterPassword.Length < 8)
+                return (false, "The master password must be at least 8 characters long.");
+            else if (!masterPassword.ContainsAny(lowercase))
+                return (false, "The master password must contain at least 1 lowercase letter.");
+            else if (!masterPassword.ContainsAny(uppercase))
+                return (false, "The master password must contain at least 1 uppercase letter.");
+            else if (!masterPassword.ContainsAny(digits))
+                return (false, "The master password must contain at least 1 digit character.");
+            else return (true, string.Empty);
         }
     }
 }
