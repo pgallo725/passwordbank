@@ -72,8 +72,9 @@ internal class Program
         Name = string.Empty,
         EmailAddress = null,
         Username = null,
+        EncryptionNonce = [],
         EncryptedPassword = [],
-        EncryptionIV = []
+        EncryptionTag = []
     };
 
 
@@ -678,8 +679,9 @@ internal class Program
             credential.Name = updatedCredential.Name;
             credential.EmailAddress = updatedCredential.EmailAddress;
             credential.Username = updatedCredential.Username;
-            credential.EncryptionIV = updatedCredential.EncryptionIV;
+            credential.EncryptionNonce = updatedCredential.EncryptionNonce;
             credential.EncryptedPassword = updatedCredential.EncryptedPassword;
+            credential.EncryptionTag = updatedCredential.EncryptionTag;
         }
         else AnsiConsole.MarkupLine($"\n[{ColorPalette.ERROR}]Failed to update the credentials in the database[/]");
 

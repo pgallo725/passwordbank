@@ -58,8 +58,9 @@ namespace PasswordBank.DataModel
                         "AccountName"   TEXT NOT NULL,
                         "EmailAddress"  TEXT,
                         "Username"  TEXT,
+                        "Nonce"  BLOB NOT NULL,
                         "Password"  BLOB NOT NULL,
-                        "CryptoIV"  BLOB NOT NULL,
+                        "AuthTag"  BLOB NOT NULL,
                         PRIMARY KEY("AccountName")
                     );
                     """;
@@ -181,10 +182,11 @@ namespace PasswordBank.DataModel
                         WHERE (name='AccountName' AND type='TEXT' AND pk=1)
                            OR (name='EmailAddress' AND type='TEXT')
                            OR (name='Username' AND type='TEXT')
+                           OR (name='Nonce' AND type='BLOB')
                            OR (name='Password' AND type='BLOB')
-                           OR (name='CryptoIV' AND type='BLOB');
+                           OR (name='AuthTag' AND type='BLOB');
                         """;
-                    found += (long)(command.ExecuteScalar() ?? 0);  // should return 5
+                    found += (long)(command.ExecuteScalar() ?? 0);  // should return 6
 
                     command = database.connection.CreateCommand();
                     command.CommandText = """
@@ -197,7 +199,7 @@ namespace PasswordBank.DataModel
                 }
 
                 // Validate the content of the ServiceData table
-                if (found == 9)
+                if (found == 10)
                 {
                     command = database.connection.CreateCommand();
                     command.CommandText = """
@@ -210,7 +212,7 @@ namespace PasswordBank.DataModel
 
                 // Validate the database version number
                 int version = 0;
-                if (found == 13)
+                if (found == 14)
                 {
                     command = database.connection.CreateCommand();
                     command.CommandText = """
@@ -229,7 +231,7 @@ namespace PasswordBank.DataModel
                     }
                 }
 
-                if (found != 13 || version != 1)
+                if (found != 14 || version != 1)
                     throw new ApplicationException("Invalid database schema.");
 
                 return database;
@@ -358,7 +360,7 @@ namespace PasswordBank.DataModel
         {
             using var command = connection.CreateCommand();
             command.CommandText = """
-                SELECT AccountName, EmailAddress, Username, Password, CryptoIV
+                SELECT AccountName, EmailAddress, Username, Nonce, Password, AuthTag
                 FROM Credentials;
                 """;
             using var reader = command.ExecuteReader();
@@ -369,8 +371,9 @@ namespace PasswordBank.DataModel
                 string accountName       = reader.GetString(0);
                 string? emailAddress     = reader.IsDBNull(1) ? null : reader.GetString(1);
                 string? username         = reader.IsDBNull(2) ? null : reader.GetString(2);
-                byte[] encryptedPassword = reader.GetFieldValue<byte[]>(3);
-                byte[] encryptionIV      = reader.GetFieldValue<byte[]>(4);
+                byte[] encryptionNonce   = reader.GetFieldValue<byte[]>(3);
+                byte[] encryptedPassword = reader.GetFieldValue<byte[]>(4);
+                byte[] encryptionTag     = reader.GetFieldValue<byte[]>(5);
 
                 // Create entry with the values read from the DB
                 EncryptedCredential credential = new()
@@ -378,8 +381,9 @@ namespace PasswordBank.DataModel
                     Name = accountName,
                     EmailAddress = emailAddress,
                     Username = username,
+                    EncryptionNonce = encryptionNonce,
                     EncryptedPassword = encryptedPassword,
-                    EncryptionIV = encryptionIV
+                    EncryptionTag = encryptionTag
                 };
                 entries.Add(credential);
             }
@@ -401,7 +405,7 @@ namespace PasswordBank.DataModel
 
             using var command = connection.CreateCommand();
             command.CommandText = """
-                SELECT AccountName, EmailAddress, Username, Password, CryptoIV
+                SELECT AccountName, EmailAddress, Username, Nonce, Password, AuthTag
                 FROM Credentials;
                 """;
             using var reader = command.ExecuteReader();
@@ -417,8 +421,9 @@ namespace PasswordBank.DataModel
                 if (accountName.Contains(searchString, StringComparison.InvariantCultureIgnoreCase) ||
                     (emailAddress?.Equals(searchString, StringComparison.OrdinalIgnoreCase) ?? false))
                 {
-                    byte[] encryptedPassword = reader.GetFieldValue<byte[]>(3);
-                    byte[] encryptionIV = reader.GetFieldValue<byte[]>(4);
+                    byte[] encryptionNonce = reader.GetFieldValue<byte[]>(3);
+                    byte[] encryptedPassword = reader.GetFieldValue<byte[]>(4);
+                    byte[] encryptionTag = reader.GetFieldValue<byte[]>(5);
 
                     // Create entry with the values read from the DB
                     EncryptedCredential credential = new()
@@ -426,8 +431,9 @@ namespace PasswordBank.DataModel
                         Name = accountName,
                         EmailAddress = emailAddress,
                         Username = username,
+                        EncryptionNonce = encryptionNonce,
                         EncryptedPassword = encryptedPassword,
-                        EncryptionIV = encryptionIV
+                        EncryptionTag = encryptionTag
                     };
                     entries.Add(credential);
                 }
@@ -467,13 +473,14 @@ namespace PasswordBank.DataModel
             using var command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO Credentials
-                VALUES( $account, $email, $username, $password, $iv );
+                VALUES( $account, $email, $username, $nonce, $password, $tag );
                 """;
             command.Parameters.AddWithValue("$account", record.Name);
             command.Parameters.AddWithValue("$email", record.EmailAddress ?? string.Empty);
             command.Parameters.AddWithValue("$username", record.Username ?? string.Empty);
+            command.Parameters.AddWithValue("$nonce", record.EncryptionNonce);
             command.Parameters.AddWithValue("$password", record.EncryptedPassword);
-            command.Parameters.AddWithValue("$iv", record.EncryptionIV);
+            command.Parameters.AddWithValue("$tag", record.EncryptionTag);
             int added = command.ExecuteNonQuery();
             return (added == 1);
         }
@@ -490,14 +497,16 @@ namespace PasswordBank.DataModel
             using var command = connection.CreateCommand();
             command.CommandText = """
                 UPDATE Credentials
-                SET AccountName = $newAccount, EmailAddress = $email, Username = $username, Password = $password, CryptoIV = $iv
+                SET AccountName = $newAccount, EmailAddress = $email, Username = $username,
+                    Nonce = $nonce, Password = $password, AuthTag = $tag
                 WHERE AccountName = $oldAccount;
                 """;
             command.Parameters.AddWithValue("$newAccount", newRecord.Name);
             command.Parameters.AddWithValue("$email", newRecord.EmailAddress ?? string.Empty);
             command.Parameters.AddWithValue("$username", newRecord.Username ?? string.Empty);
+            command.Parameters.AddWithValue("$nonce", newRecord.EncryptionNonce);
             command.Parameters.AddWithValue("$password", newRecord.EncryptedPassword);
-            command.Parameters.AddWithValue("$iv", newRecord.EncryptionIV);
+            command.Parameters.AddWithValue("$tag", newRecord.EncryptionTag);
             command.Parameters.AddWithValue("$oldAccount", oldRecord.Name);
 
             int updated = command.ExecuteNonQuery();
@@ -543,10 +552,12 @@ namespace PasswordBank.DataModel
             using var command = connection.CreateCommand();
             command.CommandText = """
                     UPDATE Credentials
-                    SET Password = $password
+                    SET Nonce = $nonce, Password = $password, AuthTag = $tag
                     WHERE AccountName = $account;
                     """;
+            command.Parameters.Add("$nonce", SqliteType.Blob);
             command.Parameters.Add("$password", SqliteType.Blob);
+            command.Parameters.Add("$tag", SqliteType.Blob);
             command.Parameters.Add("$account", SqliteType.Text);
             command.Prepare();
 
@@ -562,11 +573,16 @@ namespace PasswordBank.DataModel
                 int updated = 0;
                 foreach (EncryptedCredential credential in credentials)
                 {
-                    string password = AES256.Decrypt(credential.EncryptedPassword, oldEncryptionKey, credential.EncryptionIV);
-                    byte[] encryptedPassword = AES256.Encrypt(password, newEncryptionKey, credential.EncryptionIV);
+                    string password = AES256.Decrypt(credential.EncryptedPassword,
+                        oldEncryptionKey, credential.EncryptionNonce, credential.EncryptionTag);
 
-                    command.Parameters[0].Value = encryptedPassword;
-                    command.Parameters[1].Value = credential.Name;
+                    byte[] newEncryptionNonce = Cryptography.Random.GenerateBytes(12);
+                    (byte[] newEncryptedPassword, byte[] newAuthenticationTag) = AES256.Encrypt(password, newEncryptionKey, newEncryptionNonce);
+
+                    command.Parameters[0].Value = newEncryptionNonce;
+                    command.Parameters[1].Value = newEncryptedPassword;
+                    command.Parameters[2].Value = newAuthenticationTag;
+                    command.Parameters[3].Value = credential.Name;
                     updated += command.ExecuteNonQuery();
                 }
 

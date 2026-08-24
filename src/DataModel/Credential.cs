@@ -11,14 +11,17 @@ namespace PasswordBank.DataModel
 
         public EncryptedCredential Encrypt(byte[] key)
         {
-            byte[] iv = Cryptography.Random.GenerateBytes(16);
+            byte[] nonce = Cryptography.Random.GenerateBytes(12);
+            (byte[] ciphertext, byte[] tag) = AES256.Encrypt(Password, key, nonce);
+
             return new EncryptedCredential()
             {
                 Name = Name,
                 EmailAddress = EmailAddress,
                 Username = Username,
-                EncryptedPassword = AES256.Encrypt(Password, key, iv),
-                EncryptionIV = iv
+                EncryptionNonce = nonce,
+                EncryptedPassword = ciphertext,
+                EncryptionTag = tag
             };
         }
     }
@@ -28,8 +31,9 @@ namespace PasswordBank.DataModel
         public required string  Name              { get; set; }
         public required string? EmailAddress      { get; set; }
         public required string? Username          { get; set; }
+        public required byte[]  EncryptionNonce   { get; set; }
         public required byte[]  EncryptedPassword { get; set; }
-        public required byte[]  EncryptionIV      { get; set; }
+        public required byte[]  EncryptionTag     { get; set; }
 
         public CredentialInfo Decrypt(byte[] key)
         {
@@ -38,7 +42,7 @@ namespace PasswordBank.DataModel
                 Name = Name,
                 EmailAddress = EmailAddress,
                 Username = Username,
-                Password = AES256.Decrypt(EncryptedPassword, key, EncryptionIV),
+                Password = AES256.Decrypt(EncryptedPassword, key, EncryptionNonce, EncryptionTag),
             };
         }
     }
