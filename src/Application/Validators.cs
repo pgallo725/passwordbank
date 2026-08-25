@@ -84,13 +84,13 @@ namespace PasswordBank.Application
     /// which would otherwise be rejected because it already exists in the database.
     /// </summary>
     /// <param name="database">A reference to the credentials database.</param>
-    /// <param name="currentInfo">The original credential record that is being modified.</param>
-    internal class AccountNameEditValidator(Database? database, CredentialInfo currentInfo)
+    /// <param name="prevAccountName">The previous name assigned to the account that is being modified.</param>
+    internal class AccountNameEditValidator(Database? database, string prevAccountName)
         : AccountNameValidator(database)
     {
         public override (bool, string?) Validate(string accountName)
         {
-            if (string.Compare(accountName, currentInfo.Name, StringComparison.Ordinal) == 0)
+            if (string.Compare(accountName, prevAccountName, StringComparison.Ordinal) == 0)
                 return (true, string.Empty);
             else return base.Validate(accountName);
         }

@@ -2,7 +2,7 @@
 
 namespace PasswordBank.DataModel
 {
-    internal record CredentialInfo
+    internal record PlaintextCredential
     {
         public required string  Name         { get; set; }
         public required string? EmailAddress { get; set; }
@@ -35,9 +35,9 @@ namespace PasswordBank.DataModel
         public required byte[]  EncryptedPassword { get; set; }
         public required byte[]  EncryptionTag     { get; set; }
 
-        public CredentialInfo Decrypt(byte[] key)
+        public PlaintextCredential Decrypt(byte[] key)
         {
-            return new CredentialInfo()
+            return new PlaintextCredential()
             {
                 Name = Name,
                 EmailAddress = EmailAddress,

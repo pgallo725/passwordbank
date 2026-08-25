@@ -571,18 +571,15 @@ namespace PasswordBank.DataModel
             {
                 // Loop over all credentials in the database and re-encrypt them with the new key
                 int updated = 0;
-                foreach (EncryptedCredential credential in credentials)
+                foreach (EncryptedCredential oldEncryptedCredential in credentials)
                 {
-                    string password = AES256.Decrypt(credential.EncryptedPassword,
-                        oldEncryptionKey, credential.EncryptionNonce, credential.EncryptionTag);
+                    PlaintextCredential plaintextCredential = oldEncryptedCredential.Decrypt(oldEncryptionKey);
+                    EncryptedCredential newEncryptedCredential = plaintextCredential.Encrypt(newEncryptionKey);
 
-                    byte[] newEncryptionNonce = Cryptography.Random.GenerateBytes(12);
-                    (byte[] newEncryptedPassword, byte[] newAuthenticationTag) = AES256.Encrypt(password, newEncryptionKey, newEncryptionNonce);
-
-                    command.Parameters[0].Value = newEncryptionNonce;
-                    command.Parameters[1].Value = newEncryptedPassword;
-                    command.Parameters[2].Value = newAuthenticationTag;
-                    command.Parameters[3].Value = credential.Name;
+                    command.Parameters[0].Value = newEncryptedCredential.EncryptionNonce;
+                    command.Parameters[1].Value = newEncryptedCredential.EncryptedPassword;
+                    command.Parameters[2].Value = newEncryptedCredential.EncryptionTag;
+                    command.Parameters[3].Value = oldEncryptedCredential.Name;
                     updated += command.ExecuteNonQuery();
                 }
 

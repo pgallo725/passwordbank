@@ -509,17 +509,17 @@ internal class Program
         byte[] key = PBKDF2.GenerateKey(masterPassword, salt);
 
         // Display descrypted credential information in a table
-        CredentialInfo credentialInfo = credential.Decrypt(key);
+        PlaintextCredential plaintextCredential = credential.Decrypt(key);
 
         Table table = new();
         table.Title($"[{ColorPalette.PRIMARY} bold]Credential Information[/]");
         table.Border(TableBorder.Heavy);
         table.AddColumn("Key", c => c.Alignment(Justify.Right));
         table.AddColumn("Value", c => c.Alignment(Justify.Center));
-        table.AddRow($"[{ColorPalette.SECONDARY}]Website/Service[/]", credentialInfo.Name);
-        table.AddRow($"[{ColorPalette.SECONDARY}]Email Address[/]", credentialInfo.EmailAddress ?? string.Empty);
-        table.AddRow($"[{ColorPalette.SECONDARY}]Username[/]", credentialInfo.Username ?? string.Empty);
-        table.AddRow($"[{ColorPalette.SECONDARY}]Password[/]", credentialInfo.Password);
+        table.AddRow($"[{ColorPalette.SECONDARY}]Website/Service[/]", plaintextCredential.Name);
+        table.AddRow($"[{ColorPalette.SECONDARY}]Email Address[/]", plaintextCredential.EmailAddress ?? string.Empty);
+        table.AddRow($"[{ColorPalette.SECONDARY}]Username[/]", plaintextCredential.Username ?? string.Empty);
+        table.AddRow($"[{ColorPalette.SECONDARY}]Password[/]", plaintextCredential.Password);
         table.HideHeaders();
         table.ShowRowSeparators();
 
@@ -548,48 +548,40 @@ internal class Program
         AnsiConsole.WriteLine("Please insert the required account information:");
         AnsiConsole.Write('\n');
 
-        string accountName = ValidatedTextPrompt(
-            new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Website/Service:[/]")
-                .ClearOnFinish(false),
-            new AccountNameValidator(database)
-            );
-
-        string emailAddress = ValidatedTextPrompt(
-            new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Email Address:[/]")
-                .AllowEmpty()
-                .ClearOnFinish(false),
-            new EmailAddressValidator()
-            );
-
-        string username = ValidatedTextPrompt(
-            new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Username:[/]")
-                .AllowEmpty()
-                .ClearOnFinish(false),
-            new BasicValidator()
-            );
-
-        string password = ValidatedTextPrompt(
-            new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Password:[/]")
-                .Secret()
-                .ClearOnFinish(false),
-            new PasswordValidator()
-            );
-
-        CredentialInfo credentialInfo = new()
+        PlaintextCredential plaintextCredential = new()
         {
-            Name = accountName,
-            EmailAddress = string.IsNullOrWhiteSpace(emailAddress) ? null : emailAddress,
-            Username = string.IsNullOrWhiteSpace(username) ? null : username,
-            Password = password
+            Name = ValidatedTextPrompt(
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Website/Service:[/]")
+                    .ClearOnFinish(false),
+                new AccountNameValidator(database)
+            ),
+            EmailAddress = ValidatedTextPrompt(
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Email Address:[/]")
+                    .AllowEmpty()
+                    .ClearOnFinish(false),
+                new EmailAddressValidator()
+            ),
+            Username = ValidatedTextPrompt(
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Username:[/]")
+                    .AllowEmpty()
+                    .ClearOnFinish(false),
+                new BasicValidator()
+            ),
+            Password = ValidatedTextPrompt(
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Password:[/]")
+                    .Secret()
+                    .ClearOnFinish(false),
+                new PasswordValidator()
+            )
         };
 
         byte[] encryptionSalt = database.GetEncryptionSalt();
         byte[] encryptionKey = PBKDF2.GenerateKey(masterPassword, encryptionSalt);
 
         // Encrypt the account information before adding it to the database
-        var credential = credentialInfo.Encrypt(encryptionKey);
+        var encryptedCredential = plaintextCredential.Encrypt(encryptionKey);
 
-        if (database.Insert(credential))
+        if (database.Insert(encryptedCredential))
             AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Credentials succesfully added to the database![/]");
         else AnsiConsole.MarkupLine($"\n[{ColorPalette.ERROR}]Failed to add the credentials to the database[/]");
 
@@ -619,20 +611,20 @@ internal class Program
         byte[] encryptionKey = PBKDF2.GenerateKey(masterPassword, encryptionSalt);
 
         // Decrypt the previous credential information to use as default values
-        var credentialInfo = credential.Decrypt(encryptionKey);
+        var plaintextCredential = credential.Decrypt(encryptionKey);
 
-        string accountName = ValidatedTextPrompt(
+        plaintextCredential.Name = ValidatedTextPrompt(
             new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Website/Service:[/]")
-                .DefaultValue(credentialInfo.Name)
+                .DefaultValue(plaintextCredential.Name)
                 .EditableDefaultValue(true)
                 .HideDefaultValue()
                 .ClearOnFinish(false),
-            new AccountNameEditValidator(database, credentialInfo)
+            new AccountNameEditValidator(database, plaintextCredential.Name)
             );
 
-        string emailAddress = ValidatedTextPrompt(
+        plaintextCredential.EmailAddress = ValidatedTextPrompt(
             new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Email Address:[/]")
-                .DefaultValue(credentialInfo.EmailAddress ?? string.Empty)
+                .DefaultValue(plaintextCredential.EmailAddress ?? string.Empty)
                 .EditableDefaultValue(true)
                 .HideDefaultValue()
                 .AllowEmpty()
@@ -640,9 +632,9 @@ internal class Program
             new EmailAddressValidator()
             );
 
-        string username = ValidatedTextPrompt(
+        plaintextCredential.Username = ValidatedTextPrompt(
             new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Username:[/]")
-                .DefaultValue(credentialInfo.Username ?? string.Empty)
+                .DefaultValue(plaintextCredential.Username ?? string.Empty)
                 .EditableDefaultValue(true)
                 .HideDefaultValue()
                 .AllowEmpty()
@@ -650,38 +642,30 @@ internal class Program
             new BasicValidator()
             );
 
-        string password = ValidatedTextPrompt(
+        plaintextCredential.Password = ValidatedTextPrompt(
             new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Password:[/]")
                 .Secret()
-                .DefaultValue(credentialInfo.Password)
+                .DefaultValue(plaintextCredential.Password)
                 .EditableDefaultValue(true)
                 .HideDefaultValue()
                 .ClearOnFinish(false),
             new PasswordValidator()
             );
 
-        CredentialInfo updatedCredentialInfo = new()
-        {
-            Name = accountName,
-            EmailAddress = string.IsNullOrWhiteSpace(emailAddress) ? null : emailAddress,
-            Username = string.IsNullOrWhiteSpace(username) ? null : username,
-            Password = password
-        };
-
         // Encrypt the account information before writing it to the database
-        var updatedCredential = updatedCredentialInfo.Encrypt(encryptionKey);
+        var newEncryptedCredential = plaintextCredential.Encrypt(encryptionKey);
 
-        if (database.Update(credential, updatedCredential))
+        if (database.Update(credential, newEncryptedCredential))
         {
             AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Credentials succesfully updated in the database![/]");
 
             // Update to the new credential information in-memory
-            credential.Name = updatedCredential.Name;
-            credential.EmailAddress = updatedCredential.EmailAddress;
-            credential.Username = updatedCredential.Username;
-            credential.EncryptionNonce = updatedCredential.EncryptionNonce;
-            credential.EncryptedPassword = updatedCredential.EncryptedPassword;
-            credential.EncryptionTag = updatedCredential.EncryptionTag;
+            credential.Name = newEncryptedCredential.Name;
+            credential.EmailAddress = newEncryptedCredential.EmailAddress;
+            credential.Username = newEncryptedCredential.Username;
+            credential.EncryptionNonce = newEncryptedCredential.EncryptionNonce;
+            credential.EncryptedPassword = newEncryptedCredential.EncryptedPassword;
+            credential.EncryptionTag = newEncryptedCredential.EncryptionTag;
         }
         else AnsiConsole.MarkupLine($"\n[{ColorPalette.ERROR}]Failed to update the credentials in the database[/]");
 
