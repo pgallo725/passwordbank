@@ -14,6 +14,12 @@ namespace PasswordBank.DataModel
             "credentials.db"                        // fixed name of the credentials database file
         );
 
+        /// <summary>
+        /// This text is appended to the 'Data Source' field in the connection string<br/>
+        /// to select the cipher scheme used for encrypting the database connection.
+        /// </summary>
+        private static readonly string CipherString = "cipher=chacha20";   // uses ChaCha20 encryption + Poly1305 HMAC
+
 
         private readonly SqliteConnection connection;
 
@@ -42,7 +48,7 @@ namespace PasswordBank.DataModel
 
             var builder = new SqliteConnectionStringBuilder
             {
-                DataSource = DatabaseFilePath,
+                DataSource = $"file:{DatabaseFilePath}?{CipherString}",
                 Password = password
             };
             var database = new Database(new SqliteConnection(builder.ConnectionString));
@@ -153,7 +159,7 @@ namespace PasswordBank.DataModel
 
             var builder = new SqliteConnectionStringBuilder
             {
-                DataSource = DatabaseFilePath,
+                DataSource = $"file:{DatabaseFilePath}?{CipherString}",
                 Password = password
             };
             var database = new Database(new SqliteConnection(builder.ConnectionString));
