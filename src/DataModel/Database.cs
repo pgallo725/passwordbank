@@ -333,7 +333,7 @@ namespace PasswordBank.DataModel
                 throw new ApplicationException("Missing fields in database 'ServiceData' table.");
 
             byte[] providedPasswordHash = PBKDF2.GenerateKey(password, verificationSalt);
-            return masterPasswordHash.SequenceEqual(providedPasswordHash);
+            return Hash.Equals(providedPasswordHash, masterPasswordHash);
         }
 
 
