@@ -365,29 +365,22 @@ namespace PasswordBank.DataModel
                 """;
             using var reader = command.ExecuteReader();
 
-            var entries = new List<EncryptedCredential>();
+            var credentials = new List<EncryptedCredential>();
             while (reader.Read())
             {
-                string accountName       = reader.GetString(0);
-                string? emailAddress     = reader.IsDBNull(1) ? null : reader.GetString(1);
-                string? username         = reader.IsDBNull(2) ? null : reader.GetString(2);
-                byte[] encryptionNonce   = reader.GetFieldValue<byte[]>(3);
-                byte[] encryptedPassword = reader.GetFieldValue<byte[]>(4);
-                byte[] encryptionTag     = reader.GetFieldValue<byte[]>(5);
-
-                // Create entry with the values read from the DB
+                // Create credential record with the values read from the DB
                 EncryptedCredential credential = new()
                 {
-                    Name = accountName,
-                    EmailAddress = emailAddress,
-                    Username = username,
-                    EncryptionNonce = encryptionNonce,
-                    EncryptedPassword = encryptedPassword,
-                    EncryptionTag = encryptionTag
+                    Name              = reader.GetString(0),
+                    EmailAddress      = reader.IsDBNull(1) ? null : reader.GetString(1),
+                    Username          = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    EncryptionNonce   = reader.GetFieldValue<byte[]>(3),
+                    EncryptedPassword = reader.GetFieldValue<byte[]>(4),
+                    EncryptionTag     = reader.GetFieldValue<byte[]>(5)
                 };
-                entries.Add(credential);
+                credentials.Add(credential);
             }
-            return entries;
+            return credentials;
         }
 
 
@@ -415,25 +408,20 @@ namespace PasswordBank.DataModel
             {
                 string accountName = reader.GetString(0);
                 string? emailAddress = reader.IsDBNull(1) ? null : reader.GetString(1);
-                string? username = reader.IsDBNull(2) ? null : reader.GetString(2);
 
                 // TODO: employ a Levenshtein distance based search for more accurate results
                 if (accountName.Contains(searchString, StringComparison.InvariantCultureIgnoreCase) ||
                     (emailAddress?.Equals(searchString, StringComparison.OrdinalIgnoreCase) ?? false))
                 {
-                    byte[] encryptionNonce = reader.GetFieldValue<byte[]>(3);
-                    byte[] encryptedPassword = reader.GetFieldValue<byte[]>(4);
-                    byte[] encryptionTag = reader.GetFieldValue<byte[]>(5);
-
                     // Create entry with the values read from the DB
                     EncryptedCredential credential = new()
                     {
-                        Name = accountName,
-                        EmailAddress = emailAddress,
-                        Username = username,
-                        EncryptionNonce = encryptionNonce,
-                        EncryptedPassword = encryptedPassword,
-                        EncryptionTag = encryptionTag
+                        Name              = accountName,
+                        EmailAddress      = emailAddress,
+                        Username          = reader.IsDBNull(2) ? null : reader.GetString(2),
+                        EncryptionNonce   = reader.GetFieldValue<byte[]>(3),
+                        EncryptedPassword = reader.GetFieldValue<byte[]>(4),
+                        EncryptionTag     = reader.GetFieldValue<byte[]>(5)
                     };
                     entries.Add(credential);
                 }
