@@ -387,7 +387,7 @@ internal class Program
                 {
                     // NOTE: do not store the database object because we don't want to keep
                     //  an open connection while we're on the application main menu (unauthenticated)
-                    _ = Database.Create(firstPassword);
+                    Database.Create(firstPassword).Dispose();
 
                     AnsiConsole.Write('\n');
                     AnsiConsole.MarkupLine($"[{ColorPalette.SUCCESS}]Succesfully created credentials database![/]");
