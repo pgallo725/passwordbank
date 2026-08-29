@@ -166,7 +166,7 @@ internal class Program
                             EncryptedCredential credential = AnsiConsole.Prompt(
                                 new SelectionPrompt<EncryptedCredential>()
                                     .Title("Select a credential record to access further options:")
-                                    .UseConverter(c => c.Name)
+                                    .UseConverter(c => Markup.Escape(c.Name))
                                     .AddChoices(credentials)
                                     .AddCancelResult(NullCredential)
                                     .PageSize(10)
@@ -516,10 +516,10 @@ internal class Program
         table.Border(TableBorder.Heavy);
         table.AddColumn("Key", c => c.Alignment(Justify.Right));
         table.AddColumn("Value", c => c.Alignment(Justify.Center));
-        table.AddRow($"[{ColorPalette.SECONDARY}]Website/Service[/]", plaintextCredential.Name);
-        table.AddRow($"[{ColorPalette.SECONDARY}]Email Address[/]", plaintextCredential.EmailAddress ?? string.Empty);
-        table.AddRow($"[{ColorPalette.SECONDARY}]Username[/]", plaintextCredential.Username ?? string.Empty);
-        table.AddRow($"[{ColorPalette.SECONDARY}]Password[/]", plaintextCredential.Password);
+        table.AddRow($"[{ColorPalette.SECONDARY}]Website/Service[/]", Markup.Escape(plaintextCredential.Name));
+        table.AddRow($"[{ColorPalette.SECONDARY}]Email Address[/]", Markup.Escape(plaintextCredential.EmailAddress ?? string.Empty));
+        table.AddRow($"[{ColorPalette.SECONDARY}]Username[/]", Markup.Escape(plaintextCredential.Username ?? string.Empty));
+        table.AddRow($"[{ColorPalette.SECONDARY}]Password[/]", Markup.Escape(plaintextCredential.Password));
         table.HideHeaders();
         table.ShowRowSeparators();
 
