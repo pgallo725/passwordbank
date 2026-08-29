@@ -64,6 +64,26 @@ internal class Program
         Decoration = Decoration.None
     };
 
+#if DEBUG
+    /// <summary>
+    /// [DEBUG ONLY] Settings for printing exception messages, used throughout the application.
+    /// </summary>
+    private static readonly ExceptionSettings ExceptionStyle = new ()
+    {
+        Format = ExceptionFormats.ShortenPaths,
+        Style = new ExceptionStyle
+        {
+            Exception = new Style(ColorPalette.ERROR, null, Decoration.Bold),
+            Message = ColorPalette.ERROR,
+            Method = ColorPalette.SECONDARY,
+            Path = ColorPalette.SECONDARY,
+            LineNumber = ColorPalette.PRIMARY,
+            Dimmed = ColorPalette.NEUTRAL,
+            ParameterType = ColorPalette.PRIMARY,
+        }
+    };
+#endif
+
     /// <summary>
     /// A 'null' EncryptedCredential object to use as cancellation result.
     /// </summary>
@@ -222,8 +242,15 @@ internal class Program
             }
             catch (Exception e)
             {
-                // Print error message, wait for user confirmation and reset to main menu
+            #if DEBUG   // in Debug mode, print the whole exception trace
+            #pragma warning disable IL3050  // WriteException() only used in Debug, no need for AOT compilation
+                AnsiConsole.Write('\n');
+                AnsiConsole.WriteException(e, ExceptionStyle);
+            #pragma warning restore IL3050
+            #elif RELEASE   // in Release mode, print only a short summary of the error
                 AnsiConsole.MarkupLineInterpolated($"\n[{ColorPalette.ERROR}][[ERROR]] {e.Message}[/]");
+            #endif
+                // Wait for confirmation then go reset to the main menu
                 ContinuationPrompt();
             }
 
@@ -364,9 +391,17 @@ internal class Program
                 }
                 catch (Exception e)
                 {
-                    AnsiConsole.WriteLine(e.Message);
+                    AnsiConsole.Write('\n');
                     AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]Failed to create credentials database![/]");
                     result = false;
+
+                #if DEBUG   // in Debug mode, print the whole exception trace
+                #pragma warning disable IL3050  // WriteException() only used in Debug, no need for AOT compilation
+                    AnsiConsole.WriteException(e, ExceptionStyle);
+                #pragma warning restore IL3050
+                #elif RELEASE   // in Release mode, print only a short summary of the error
+                    AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}][[ERROR]] {e.Message}[/]");
+                #endif
                 }
 
                 ContinuationPrompt();
