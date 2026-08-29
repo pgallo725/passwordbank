@@ -1,4 +1,5 @@
-﻿using Spectre.Console;
+﻿using System.Text;
+using Spectre.Console;
 
 namespace PasswordBank.UI
 {
@@ -74,11 +75,10 @@ namespace PasswordBank.UI
 
         public static void SaveCheckpoint()
         {
-            (int column, int row) = Console.GetCursorPosition();
             checkpoints.Push(new ConsolePosition()
             {
-                Row = row,
-                Column = column
+                Row = Console.CursorTop,
+                Column = Console.CursorLeft
             });
         }
 
@@ -86,11 +86,10 @@ namespace PasswordBank.UI
         {
             if (checkpoints.Count > 0)
             {
-                (int column, int row) = Console.GetCursorPosition();
                 var currentPosition = new ConsolePosition()
                 {
-                    Row = row,
-                    Column = column
+                    Row = Console.CursorTop,
+                    Column = Console.CursorLeft
                 };
                 var checkpointPosition = checkpoints.Peek();
 
@@ -108,20 +107,36 @@ namespace PasswordBank.UI
 
         private static void ClearRegion(ConsolePosition start, ConsolePosition end)
         {
-            string clearLine = new(' ', Console.WindowWidth);
+            int rowCount = end.Row - start.Row + 1;
+            int firstRowLength = Console.BufferWidth - start.Column;
+            int lastRowLength = end.Column;
+
+            // Use a StringBuilder to minimize GC allocations
+            StringBuilder clearStringBuilder = new(rowCount * (Console.BufferWidth + 2));
+
+            // Clear the rest of the first row after start.Column
+            clearStringBuilder.Append(' ', firstRowLength);
+            clearStringBuilder.Append(Environment.NewLine);
+
+            // Clear all full rows between start.Row and end.Row
+            for (int row = 0; row < rowCount - 2; row++)
+            {
+                clearStringBuilder.Append(' ', Console.BufferWidth);
+                clearStringBuilder.Append(Environment.NewLine);
+            }
+
+            // Clear the part of the last row before end.Column
+            if (rowCount > 1)
+                clearStringBuilder.Append(' ', lastRowLength);
 
             // Position the cursor at the start of the clear region
             Console.SetCursorPosition(start.Column, start.Row);
 
-            // Clear the rest of the first row after start.Column
-            AnsiConsole.WriteLine(clearLine[start.Column..]);
-
-            // Clear all full rows between start.Row and end.Row
-            for (int i = 0; i < end.Row - start.Row - 1; i++)
-                AnsiConsole.WriteLine(clearLine);
-
-            // Clear the part of the last row before end.Column
-            AnsiConsole.Write(clearLine[..end.Column]);
+            // Write the clear string to the console
+            // Instead of calling StringBuilder.ToString(), which allocates new memory,
+            //  we write its chunks directly to the output as ReadOnlySpan<char>
+            foreach (ReadOnlyMemory<char> chunk in clearStringBuilder.GetChunks())
+                Console.Write(chunk.Span);
         }
     }
 }

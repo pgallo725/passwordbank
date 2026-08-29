@@ -336,19 +336,23 @@ internal class Program
         // Open the database connection on the first use
         database ??= Database.Open(password);
 
+        // Check the password against the key stored in the database
+        bool isCorrectPassword = database?.VerifyPassword(password) ?? false;
+
+        // NOTE: password verification is a slow operation (database access + PBKDF2)
+        //  therefore we clear the console only after, to minimize perceived delay
         ConsoleHelper.RestoreCheckpoint();
         ConsoleHelper.DeleteCheckpoint();
 
-        // Check the password against the key stored in the database
-        if (database is null || !database.VerifyPassword(password))
-        {
-            AnsiConsole.MarkupLine($" [{ColorPalette.ERROR}]FAILED[/]");
-            return string.Empty;
-        }
-        else
+        if (isCorrectPassword)
         {
             AnsiConsole.MarkupLine($" [{ColorPalette.PRIMARY}]SUCCESSFUL[/]");
             return password;
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($" [{ColorPalette.ERROR}]FAILED[/]");
+            return string.Empty;
         }
     }
 
