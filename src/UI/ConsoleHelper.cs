@@ -112,22 +112,24 @@ namespace PasswordBank.UI
             int lastRowLength = end.Column;
 
             // Use a StringBuilder to minimize GC allocations
-            StringBuilder clearStringBuilder = new(rowCount * (Console.BufferWidth + 2));
+            StringBuilder clearStringBuilder = new(rowCount * (Console.BufferWidth + 1));
 
             // Clear the rest of the first row after start.Column
             clearStringBuilder.Append(' ', firstRowLength);
-            clearStringBuilder.Append(Environment.NewLine);
 
             // Clear all full rows between start.Row and end.Row
             for (int row = 0; row < rowCount - 2; row++)
             {
+                clearStringBuilder.Append('\n');
                 clearStringBuilder.Append(' ', Console.BufferWidth);
-                clearStringBuilder.Append(Environment.NewLine);
             }
 
             // Clear the part of the last row before end.Column
             if (rowCount > 1)
+            {
+                clearStringBuilder.Append('\n');
                 clearStringBuilder.Append(' ', lastRowLength);
+            }
 
             // Position the cursor at the start of the clear region
             Console.SetCursorPosition(start.Column, start.Row);
