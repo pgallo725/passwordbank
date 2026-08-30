@@ -54,13 +54,14 @@ namespace PasswordBank.Cryptography
                 using var aes256gcm = new AesGcm(key, TagSize);
                 aes256gcm.Decrypt(nonce, ciphertext, tag, buffer.AsSpan(0, ciphertext.Length));
 
-                string plaintext = Encoding.Unicode.GetString(buffer);
+                string plaintext = Encoding.Unicode.GetString(buffer.AsSpan(0, ciphertext.Length));
                 return plaintext;
             }
             finally
             {
                 // Reset the memory before returning it to the pool, to avoid leaking decrypted data
                 CryptographicOperations.ZeroMemory(buffer);
+                ArrayPool<byte>.Shared.Return(buffer);
             }
         }
     }
