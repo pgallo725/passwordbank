@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using System.Buffers;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace PasswordBank.Cryptography
@@ -8,25 +9,28 @@ namespace PasswordBank.Cryptography
     /// </summary>
     internal class AES256
     {
+        private const int KeySize = 32; /* 256 bits */
+        private const int NonceSize = 12; /* 96 bits */
+        private const int TagSize = 16; /* 128 bits */
+
         public static (byte[], byte[]) Encrypt(string plaintext, byte[] key, byte[] nonce)
         {
             ArgumentException.ThrowIfNullOrEmpty(plaintext);
             ArgumentNullException.ThrowIfNull(key);
             ArgumentNullException.ThrowIfNull(nonce);
 
-            if (key.Length != 32 /* 256 bits */)
-                throw new ArgumentException("An AES-256 key must be exactly 32 bytes long.");
-            if (nonce.Length != 12 /* 96 bits */)
-                throw new ArgumentException("An AES-256-GCM nonce must be exactly 12 bytes long.");
+            if (key.Length != KeySize)
+                throw new ArgumentException($"An AES-256 key must be exactly {KeySize} bytes long.");
+            if (nonce.Length != NonceSize)
+                throw new ArgumentException($"An AES-256-GCM nonce must be exactly {NonceSize} bytes long.");
 
-            byte[] plaintextBytes = Encoding.Unicode.GetBytes(plaintext);
-            byte[] ciphertext = new byte[plaintextBytes.Length];
-            byte[] authenticationTag = new byte[16];
+            byte[] bytes = Encoding.Unicode.GetBytes(plaintext);
+            byte[] authenticationTag = GC.AllocateUninitializedArray<byte>(TagSize);
 
-            using var aes256gcm = new AesGcm(key, 16);
-            aes256gcm.Encrypt(nonce, plaintextBytes, ciphertext, authenticationTag);
+            using var aes256gcm = new AesGcm(key, TagSize);
+            aes256gcm.Encrypt(nonce, bytes, bytes, authenticationTag);  // use the same buffer as input and output
 
-            return (ciphertext, authenticationTag);
+            return (bytes /* ciphertext */, authenticationTag);
         }
 
         public static string Decrypt(byte[] ciphertext, byte[] key, byte[] nonce, byte[] tag)
@@ -36,20 +40,28 @@ namespace PasswordBank.Cryptography
             ArgumentNullException.ThrowIfNull(nonce);
             ArgumentNullException.ThrowIfNull(tag);
 
-            if (key.Length != 32 /* 256 bits */)
-                throw new ArgumentException("An AES-256 key must be exactly 32 bytes long.");
-            if (nonce.Length != 12 /* 96 bits */)
-                throw new ArgumentException("An AES-256-GCM nonce must be exactly 12 bytes long.");
-            if (tag.Length != 16)
-                throw new ArgumentException("An AES-256-GCM tag must be exactly 16 bytes long.");
+            if (key.Length != KeySize)
+                throw new ArgumentException($"An AES-256 key must be exactly {KeySize} bytes long.");
+            if (nonce.Length != NonceSize)
+                throw new ArgumentException($"An AES-256-GCM nonce must be exactly {NonceSize} bytes long.");
+            if (tag.Length != TagSize)
+                throw new ArgumentException($"An AES-256-GCM tag must be exactly {TagSize} bytes long.");
 
-            byte[] plaintextBytes = new byte[ciphertext.Length];
+            // Allocate decryption buffer from a pool, since it's temporary
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(ciphertext.Length);
+            try
+            {
+                using var aes256gcm = new AesGcm(key, TagSize);
+                aes256gcm.Decrypt(nonce, ciphertext, tag, buffer.AsSpan(0, ciphertext.Length));
 
-            using var aes256gcm = new AesGcm(key, 16);
-            aes256gcm.Decrypt(nonce, ciphertext, tag, plaintextBytes);
-
-            string plaintext = Encoding.Unicode.GetString(plaintextBytes);
-            return plaintext;
+                string plaintext = Encoding.Unicode.GetString(buffer);
+                return plaintext;
+            }
+            finally
+            {
+                // Reset the memory before returning it to the pool, to avoid leaking decrypted data
+                CryptographicOperations.ZeroMemory(buffer);
+            }
         }
     }
 }
