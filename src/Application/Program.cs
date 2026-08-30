@@ -6,7 +6,7 @@ using Spectre.Console;
 
 namespace PasswordBank;
 
-internal class Program
+internal partial class Program
 {
     internal enum MainMenuAction
     {
@@ -48,12 +48,6 @@ internal class Program
         };
     }
 
-
-    /// <summary>
-    /// An open connection to the credentials database, this is realized the first time <br/>
-    ///  that it's required and then cached for the lifetime of the program.
-    /// </summary>
-    private static Database? database;
 
     /// <summary>
     /// A 'null' EncryptedCredential object to use as cancellation result.
@@ -225,11 +219,6 @@ internal class Program
                 ContinuationPrompt();
             }
 
-            // Close any open database connection, because the user is
-            //  unauthenticated while on the application's main menu
-            database?.Dispose();
-            database = null;
-
             // Clear everything before showing the main menu again
             ConsoleHelper.RestoreCheckpoint();
         }
@@ -237,95 +226,6 @@ internal class Program
 
 
 
-
-
-    private static string ValidatedTextPrompt(TextPrompt<string> prompt, IValidator validator)
-    {
-        // Store the row number before the prompt
-        (int column, int row) = Console.GetCursorPosition();
-
-        // Disable built-in prompt validation
-        prompt.Validator = null;
-        prompt.ValidationErrorMessage = string.Empty;
-
-        // Setup prompt to show editable default values
-        prompt.ShowDefaultValue = false;
-        prompt.EditableDefaultValue = true;
-
-        while (true)
-        {
-            string input = AnsiConsole.Prompt(prompt);
-            if (string.IsNullOrEmpty(input) && prompt.AllowEmpty)
-                return input;
-
-            (bool isValid, string? errorMessage) = validator.Validate(input);
-            if (!isValid)
-            {
-                // Print error message and set the current input as the default value
-                // for the existing prompt, so that the user can edit in-place
-                AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}]{errorMessage}[/]");
-                prompt.DefaultValue(input);
-                Console.SetCursorPosition(column, row); // the updated prompt will cover the existing text perfectly
-            }
-            else
-            {
-                Console.SetCursorPosition(column, row + 1);
-                AnsiConsole.Write(new string(' ', Console.WindowWidth));  // clear error line
-                Console.SetCursorPosition(column, row + 1);
-                return input;
-            }
-        }
-    }
-
-
-    private static void ContinuationPrompt()
-    {
-        AnsiConsole.Markup($"[{ColorPalette.NEUTRAL}]Press[/] " +
-            $"[{ColorPalette.NEUTRAL_LIGHT} slowblink]Enter[/] " +
-            $"[{ColorPalette.NEUTRAL}]to continue...[/]");
-
-        ConsoleHelper.WaitForEnterKey();
-    }
-
-
-    private static string AuthenticationPrompt()
-    {
-        // Action title
-        AnsiConsole.Markup($"[{ColorPalette.NEUTRAL}]>> AUTHENTICATION[/]");
-
-        ConsoleHelper.SaveCheckpoint();
-
-        AnsiConsole.Write('\n');
-        AnsiConsole.Write('\n');
-
-        string password = AnsiConsole.Prompt(
-            new TextPrompt<string>($"Insert your [{ColorPalette.SECONDARY} slowblink]master password[/]: ")
-                .Secret()
-                .ClearOnFinish(false)
-            );
-
-        // Open the database connection on the first use
-        database ??= Database.Open(password);
-
-        // Check the password against the key stored in the database
-        bool isCorrectPassword = database?.VerifyPassword(password) ?? false;
-
-        // NOTE: password verification is a slow operation (database access + PBKDF2)
-        //  therefore we clear the console only after, to minimize perceived delay
-        ConsoleHelper.RestoreCheckpoint();
-        ConsoleHelper.DeleteCheckpoint();
-
-        if (isCorrectPassword)
-        {
-            AnsiConsole.MarkupLine($" [{ColorPalette.PRIMARY}]SUCCESSFUL[/]");
-            return password;
-        }
-        else
-        {
-            AnsiConsole.MarkupLine($" [{ColorPalette.ERROR}]FAILED[/]");
-            return string.Empty;
-        }
-    }
 
 
     private static bool Action_CreateDatabase()
@@ -400,11 +300,10 @@ internal class Program
         // Action title
         AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]CHANGE MASTER PASSWORD[/]");
 
-        // Authenticate the user and load the database
-        string currentPassword = AuthenticationPrompt();
-        AnsiConsole.Write('\n');
+        // Authenticate the user and open the database
+        using Database? database = AuthenticationPrompt(out string currentPassword);
 
-        if (string.IsNullOrEmpty(currentPassword) || database is null)
+        if (database is null)
         {
             ContinuationPrompt();
             return;
@@ -453,11 +352,10 @@ internal class Program
         // Action title
         AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]VIEW CREDENTIALS[/]");
 
-        // Authenticate the user
-        string masterPassword = AuthenticationPrompt();
-        AnsiConsole.Write('\n');
+        // Authenticate the user and open the database
+        using Database? database = AuthenticationPrompt(out _);
 
-        if (string.IsNullOrEmpty(masterPassword) || database is null)
+        if (database is null)
         {
             ContinuationPrompt();
             return null;
@@ -475,11 +373,10 @@ internal class Program
         // Action title
         AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]SEARCH CREDENTIALS[/]");
 
-        // Authenticate the user
-        string masterPassword = AuthenticationPrompt();
-        AnsiConsole.Write('\n');
+        // Authenticate the user and open the database
+        using Database? database = AuthenticationPrompt(out _);
 
-        if (string.IsNullOrEmpty(masterPassword) || database is null)
+        if (database is null)
         {
             ContinuationPrompt();
             return null;
@@ -504,11 +401,10 @@ internal class Program
         // Action title
         AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]VIEW CREDENTIAL INFORMATION[/]");
 
-        // Authenticate the user
-        string masterPassword = AuthenticationPrompt();
-        AnsiConsole.Write('\n');
+        // Authenticate the user and open the database
+        using Database? database = AuthenticationPrompt(out string masterPassword);
 
-        if (string.IsNullOrEmpty(masterPassword) || database is null)
+        if (database is null)
         {
             ContinuationPrompt();
             return;
@@ -545,11 +441,10 @@ internal class Program
         // Action title
         AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]ADD ACCOUNT[/]");
 
-        // Authenticate the user and load the database
-        string masterPassword = AuthenticationPrompt();
-        AnsiConsole.Write('\n');
+        // Authenticate the user and open the database
+        using Database? database = AuthenticationPrompt(out string masterPassword);
 
-        if (string.IsNullOrEmpty(masterPassword) || database is null)
+        if (database is null)
         {
             ContinuationPrompt();
             return;
@@ -604,11 +499,10 @@ internal class Program
         // Action title
         AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]EDIT CREDENTIAL[/]");
 
-        // Authenticate the user
-        string masterPassword = AuthenticationPrompt();
-        AnsiConsole.Write('\n');
+        // Authenticate the user and open the database
+        using Database? database = AuthenticationPrompt(out string masterPassword);
 
-        if (string.IsNullOrEmpty(masterPassword) || database is null)
+        if (database is null)
         {
             ContinuationPrompt();
             return;
@@ -688,11 +582,10 @@ internal class Program
         // Action title
         AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]DELETE CREDENTIAL[/]");
 
-        // Authenticate the user
-        string masterPassword = AuthenticationPrompt();
-        AnsiConsole.Write('\n');
+        // Authenticate the user and open the database
+        using Database? database = AuthenticationPrompt(out _);
 
-        if (string.IsNullOrEmpty(masterPassword) || database is null)
+        if (database is null)
         {
             ContinuationPrompt();
             return;
