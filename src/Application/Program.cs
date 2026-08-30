@@ -56,35 +56,6 @@ internal class Program
     private static Database? database;
 
     /// <summary>
-    /// Style used throughout the application for highlighting the currently selected option.
-    /// </summary>
-    private static readonly Style HighlightStyle = new ()
-    {
-        Foreground = ColorPalette.HIGHLIGHT,
-        Decoration = Decoration.None
-    };
-
-#if DEBUG
-    /// <summary>
-    /// [DEBUG ONLY] Settings for printing exception messages, used throughout the application.
-    /// </summary>
-    private static readonly ExceptionSettings ExceptionStyle = new ()
-    {
-        Format = ExceptionFormats.ShortenPaths,
-        Style = new ExceptionStyle
-        {
-            Exception = new Style(ColorPalette.ERROR, null, Decoration.Bold),
-            Message = ColorPalette.ERROR,
-            Method = ColorPalette.SECONDARY,
-            Path = ColorPalette.SECONDARY,
-            LineNumber = ColorPalette.PRIMARY,
-            Dimmed = ColorPalette.NEUTRAL,
-            ParameterType = ColorPalette.PRIMARY,
-        }
-    };
-#endif
-
-    /// <summary>
     /// A 'null' EncryptedCredential object to use as cancellation result.
     /// </summary>
     private static readonly EncryptedCredential NullCredential = new()
@@ -153,7 +124,7 @@ internal class Program
                                     MainMenuAction.ChangePassword,
                                     MainMenuAction.Quit)
                         .AddCancelResult(MainMenuAction.Quit)
-                        .HighlightStyle(HighlightStyle)
+                        .HighlightStyle(Styles.HIGHLIGHT)
                 );
                 // Clear the main menu before continuing into the selected action
                 ConsoleHelper.RestoreCheckpoint();
@@ -192,7 +163,7 @@ internal class Program
                                     .PageSize(10)
                                     .MoreChoicesText($"[{ColorPalette.NEUTRAL}](Use arrow keys to see more credentials)[/]")
                                     .WrapAround(true)
-                                    .HighlightStyle(HighlightStyle)
+                                    .HighlightStyle(Styles.HIGHLIGHT)
                             );
                             // Clear the credentials list before continuing to the next menu
                             ConsoleHelper.RestoreCheckpoint();
@@ -210,7 +181,7 @@ internal class Program
                                                 CredentialAction.Delete,
                                                 CredentialAction.Cancel)
                                     .AddCancelResult(CredentialAction.Cancel)
-                                    .HighlightStyle(HighlightStyle)
+                                    .HighlightStyle(Styles.HIGHLIGHT)
                             );
                             // Clear the menu before continuing into the selected action
                             ConsoleHelper.RestoreCheckpoint();
@@ -245,7 +216,7 @@ internal class Program
             #if DEBUG   // in Debug mode, print the whole exception trace
             #pragma warning disable IL3050  // WriteException() only used in Debug, no need for AOT compilation
                 AnsiConsole.Write('\n');
-                AnsiConsole.WriteException(e, ExceptionStyle);
+                AnsiConsole.WriteException(e, Styles.EXCEPTION);
             #pragma warning restore IL3050
             #elif RELEASE   // in Release mode, print only a short summary of the error
                 AnsiConsole.MarkupLineInterpolated($"\n[{ColorPalette.ERROR}][[ERROR]] {e.Message}[/]");
@@ -401,7 +372,7 @@ internal class Program
 
                 #if DEBUG   // in Debug mode, print the whole exception trace
                 #pragma warning disable IL3050  // WriteException() only used in Debug, no need for AOT compilation
-                    AnsiConsole.WriteException(e, ExceptionStyle);
+                    AnsiConsole.WriteException(e, Styles.EXCEPTION);
                 #pragma warning restore IL3050
                 #elif RELEASE   // in Release mode, print only a short summary of the error
                     AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}][[ERROR]] {e.Message}[/]");
