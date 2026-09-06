@@ -280,13 +280,11 @@ internal partial class Program
             return;
         }
 
-        // Generate decryption key from user password
-        byte[] salt = database.GetEncryptionSalt();
-        byte[] key = PBKDF2.GenerateKey(masterPassword, salt);
+        // Decrypt the credential record in-memory
+        KeyGenerator keygen = database.GetKeyGenerator();
+        PlaintextCredential plaintextCredential = credential.Decrypt(keygen, masterPassword);
 
-        // Display descrypted credential information in a table
-        PlaintextCredential plaintextCredential = credential.Decrypt(key);
-
+        // Display credential information in a table
         Table table = new();
         table.Title($"[{ColorPalette.PRIMARY} bold]Credential Information[/]");
         table.Border(TableBorder.Heavy);
@@ -360,11 +358,9 @@ internal partial class Program
             )
         };
 
-        byte[] encryptionSalt = database.GetEncryptionSalt();
-        byte[] encryptionKey = PBKDF2.GenerateKey(masterPassword, encryptionSalt);
-
         // Encrypt the account information before adding it to the database
-        var encryptedCredential = plaintextCredential.Encrypt(encryptionKey);
+        KeyGenerator keygen = database.GetKeyGenerator();
+        EncryptedCredential encryptedCredential = plaintextCredential.Encrypt(keygen, masterPassword);
 
         if (database.Insert(encryptedCredential))
             AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Credentials Successfully added to the database![/]");
@@ -404,11 +400,9 @@ internal partial class Program
         AnsiConsole.WriteLine("Update the credentials information:");
         AnsiConsole.Write('\n');
 
-        byte[] encryptionSalt = database.GetEncryptionSalt();
-        byte[] encryptionKey = PBKDF2.GenerateKey(masterPassword, encryptionSalt);
-
         // Decrypt the previous credential information to use as default values
-        var plaintextCredential = credential.Decrypt(encryptionKey);
+        KeyGenerator keygen = database.GetKeyGenerator();
+        var plaintextCredential = credential.Decrypt(keygen, masterPassword);
 
         plaintextCredential.Name = ValidatedTextPrompt(
             new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Website/Service:[/]")
@@ -450,7 +444,7 @@ internal partial class Program
             );
 
         // Encrypt the account information before writing it to the database
-        var newEncryptedCredential = plaintextCredential.Encrypt(encryptionKey);
+        var newEncryptedCredential = plaintextCredential.Encrypt(keygen, masterPassword);
 
         if (database.Update(credential, newEncryptedCredential))
         {

@@ -1,5 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
 using PasswordBank.Cryptography;
+using System.Buffers;
+using System.Security.Cryptography;
 
 namespace PasswordBank.DataModel
 {
@@ -84,9 +86,11 @@ namespace PasswordBank.DataModel
                 command.ExecuteNonQuery();
 
                 // Generate the master salts and the master password hash
-                byte[] verificationSalt = Cryptography.Random.GenerateBytes(16);
-                byte[] encryptionSalt = Cryptography.Random.GenerateBytes(16);
-                byte[] masterPasswordHash = PBKDF2.GenerateKey(password, verificationSalt);
+                byte[] verificationSalt = Cryptography.Random.GenerateBytes(PBKDF2.SaltSize);
+                byte[] encryptionSalt = Cryptography.Random.GenerateBytes(PBKDF2.SaltSize);
+                byte[] masterPasswordHash = new byte[PBKDF2.OutputSize];
+                PBKDF2.GenerateKey(password, verificationSalt, masterPasswordHash);
+
                 byte[] databaseVersion = BitConverter.GetBytes(1);
                 if (!BitConverter.IsLittleEndian)
                     Array.Reverse(databaseVersion); // make sure byte sequence is little endian
@@ -261,10 +265,21 @@ namespace PasswordBank.DataModel
 
 
         /// <summary>
+        /// Instantiate a KeyGenerator object that, provided with the master password,<br/>
+        /// can be used to generate the AES-256 key used to encrypt records in the database.
+        /// </summary>
+        /// <returns>A new KeyGenerator instance.</returns>
+        public KeyGenerator GetKeyGenerator()
+        {
+            return new KeyGenerator(GetEncryptionSalt());
+        }
+
+
+        /// <summary>
         /// Retrieve the encryption key generation salt from the database.
         /// </summary>
         /// <returns>The byte array containing the salt to use for generating the AES-256 encryption key.</returns>
-        public byte[] GetEncryptionSalt()
+        private byte[] GetEncryptionSalt()
         {
             using var command = connection.CreateCommand();
             command.CommandText = """
@@ -314,32 +329,59 @@ namespace PasswordBank.DataModel
                 """;
             using var reader = command.ExecuteReader();
 
-            byte[] masterPasswordHash = [];
-            byte[] verificationSalt = [];
-
-            while (reader.Read())
+            // Allocate buffers from a pool to store all the temporary data used by this function
+            byte[] bufferInputHash = ArrayPool<byte>.Shared.Rent(PBKDF2.OutputSize);
+            byte[] bufferMasterHash = ArrayPool<byte>.Shared.Rent(PBKDF2.OutputSize);
+            byte[] bufferSalt = ArrayPool<byte>.Shared.Rent(PBKDF2.SaltSize);
+            try
             {
-                switch (reader.GetString(0))
+                bool hasMasterHash = false;
+                bool hasSalt = false;
+
+                while (reader.Read())
                 {
-                    case "MasterPasswordHash":
-                        masterPasswordHash = reader.GetFieldValue<byte[]>(1);
-                        break;
+                    switch (reader.GetString(0))
+                    {
+                        case "MasterPasswordHash":
+                            if (reader.GetBytes(1, 0, bufferMasterHash, 0, PBKDF2.OutputSize) != PBKDF2.OutputSize)
+                                throw new ApplicationException("Invalid master password hash retrieved from the database.");
+                            hasMasterHash = true;
+                            break;
 
-                    case "VerificationSalt":
-                        verificationSalt = reader.GetFieldValue<byte[]>(1);
-                        break;
+                        case "VerificationSalt":
+                            if (reader.GetBytes(1, 0, bufferSalt, 0, PBKDF2.SaltSize) != PBKDF2.SaltSize)
+                                throw new ApplicationException("Invalid password verification salt retrieved from the database.");
+                            hasSalt = true;
+                            break;
 
-                    default:
-                        throw new ApplicationException(
-                            "Unexpected value in column 'Name' of table 'ServiceData'."
-                        );
+                        default:
+                            throw new ApplicationException(
+                                "Unexpected value in column 'Name' of table 'ServiceData'."
+                            );
+                    }
                 }
-            }
-            if (masterPasswordHash.Length == 0 || verificationSalt.Length == 0)
-                throw new ApplicationException("Missing fields in database 'ServiceData' table.");
 
-            byte[] providedPasswordHash = PBKDF2.GenerateKey(password, verificationSalt);
-            return Hash.Equals(providedPasswordHash, masterPasswordHash);
+                if (!hasSalt || !hasMasterHash)
+                    throw new ApplicationException("Missing fields in database 'ServiceData' table.");
+
+                Span<byte> inputPasswordHash = bufferInputHash.AsSpan(0, PBKDF2.OutputSize);
+                Span<byte> masterPasswordHash = bufferInputHash.AsSpan(0, PBKDF2.OutputSize);
+                Span<byte> verificationSalt = bufferInputHash.AsSpan(0, PBKDF2.SaltSize);
+
+                PBKDF2.GenerateKey(password, verificationSalt, inputPasswordHash);
+                return Hash.Equals(inputPasswordHash, masterPasswordHash);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(bufferInputHash);
+                ArrayPool<byte>.Shared.Return(bufferInputHash);
+
+                CryptographicOperations.ZeroMemory(bufferMasterHash);
+                ArrayPool<byte>.Shared.Return(bufferMasterHash);
+
+                CryptographicOperations.ZeroMemory(bufferSalt);
+                ArrayPool<byte>.Shared.Return(bufferSalt);
+            }
         }
 
 
@@ -555,11 +597,20 @@ namespace PasswordBank.DataModel
             command.Parameters.Add("$account", SqliteType.Text);
             command.Prepare();
 
-            byte[] encryptionSalt = GetEncryptionSalt();
+            // Generate the hash for verifying the new master password
             byte[] verificationSalt = GetVerificationSalt();
-            byte[] oldEncryptionKey = PBKDF2.GenerateKey(oldPassword, encryptionSalt);
-            byte[] newEncryptionKey = PBKDF2.GenerateKey(newPassword, encryptionSalt);
-            byte[] newPasswordHash = PBKDF2.GenerateKey(newPassword, verificationSalt);
+            byte[] bufferHash = ArrayPool<byte>.Shared.Rent(PBKDF2.OutputSize);
+            Span<byte> newPasswordHash = bufferHash.AsSpan(0, PBKDF2.OutputSize);
+            PBKDF2.GenerateKey(newPassword, verificationSalt, newPasswordHash);
+
+            // Generate the keys only once before the loop over all database records
+            KeyGenerator keygen = GetKeyGenerator();
+            byte[] bufferOldKey = ArrayPool<byte>.Shared.Rent(AES256.KeySize);
+            byte[] bufferNewKey = ArrayPool<byte>.Shared.Rent(AES256.KeySize);
+            Span<byte> oldEncryptionKey = bufferOldKey.AsSpan(0, AES256.KeySize);
+            Span<byte> newEncryptionKey = bufferNewKey.AsSpan(0, AES256.KeySize);
+            keygen.GetKey(oldPassword, oldEncryptionKey);
+            keygen.GetKey(newPassword, newEncryptionKey);
 
             try
             {
@@ -584,7 +635,7 @@ namespace PasswordBank.DataModel
                     SET Value = $hash
                     WHERE Name = 'MasterPasswordHash';
                     """;
-                command.Parameters.AddWithValue("$hash", newPasswordHash);
+                command.Parameters.AddWithValue("$hash", newPasswordHash.ToArray());
                 updated += command.ExecuteNonQuery();
 
                 if (updated != credentials.Count + 1 /* for the password hash */)
@@ -618,6 +669,17 @@ namespace PasswordBank.DataModel
             {
                 transaction.Rollback();
                 return false;
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(bufferOldKey);
+                ArrayPool<byte>.Shared.Return(bufferOldKey);
+
+                CryptographicOperations.ZeroMemory(bufferNewKey);
+                ArrayPool<byte>.Shared.Return(bufferNewKey);
+
+                CryptographicOperations.ZeroMemory(bufferHash);
+                ArrayPool<byte>.Shared.Return(bufferHash);
             }
         }
     }

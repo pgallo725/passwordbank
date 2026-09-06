@@ -8,20 +8,25 @@ namespace PasswordBank.Cryptography
     /// </summary>
     internal class PBKDF2
     {
-        public static byte[] GenerateKey(string password, byte[] salt)
+        public const int SaltSize = 16; /* 16 bytes */
+        public const int OutputSize = 32; /* 256 bits */
+
+        public static void GenerateKey(string password, ReadOnlySpan<byte> salt, Span<byte> destination)
         {
             ArgumentException.ThrowIfNullOrEmpty(password);
-            ArgumentNullException.ThrowIfNull(salt);
 
-            if (salt.Length < 16)
-                throw new ArgumentException("PBKDF2 requires at least 16 bytes of salt", nameof(salt));
+            if (salt.Length < SaltSize)
+                throw new ArgumentException($"PBKDF2 requires at least {SaltSize} bytes of salt", nameof(salt));
 
-            return Rfc2898DeriveBytes.Pbkdf2(
+            if (destination.Length != OutputSize)
+                throw new ArgumentException($"PBKDF2 requires exactly {OutputSize} bytes in the output buffer", nameof(destination));
+
+            Rfc2898DeriveBytes.Pbkdf2(
                 password,
                 salt,
+                destination,
                 300000 /* iterations */,
-                HashAlgorithmName.SHA512,
-                32 /* 256-bit key for AES-256 */
+                HashAlgorithmName.SHA512
             );
         }
     }

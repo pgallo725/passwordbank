@@ -9,15 +9,13 @@ namespace PasswordBank.Cryptography
     /// </summary>
     internal class AES256
     {
-        private const int KeySize = 32; /* 256 bits */
-        private const int NonceSize = 12; /* 96 bits */
-        private const int TagSize = 16; /* 128 bits */
+        public const int KeySize = 32; /* 256 bits */
+        public const int NonceSize = 12; /* 96 bits */
+        public const int TagSize = 16; /* 128 bits */
 
-        public static (byte[], byte[]) Encrypt(string plaintext, byte[] key, byte[] nonce)
+        public static (byte[], byte[]) Encrypt(string plaintext, ReadOnlySpan<byte> key, ReadOnlySpan<byte> nonce)
         {
             ArgumentException.ThrowIfNullOrEmpty(plaintext);
-            ArgumentNullException.ThrowIfNull(key);
-            ArgumentNullException.ThrowIfNull(nonce);
 
             if (key.Length != KeySize)
                 throw new ArgumentException($"An AES-256 key must be exactly {KeySize} bytes long.");
@@ -33,13 +31,8 @@ namespace PasswordBank.Cryptography
             return (bytes /* ciphertext */, authenticationTag);
         }
 
-        public static string Decrypt(byte[] ciphertext, byte[] key, byte[] nonce, byte[] tag)
+        public static string Decrypt(ReadOnlySpan<byte> ciphertext, ReadOnlySpan<byte> key, ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> tag)
         {
-            ArgumentNullException.ThrowIfNull(ciphertext);
-            ArgumentNullException.ThrowIfNull(key);
-            ArgumentNullException.ThrowIfNull(nonce);
-            ArgumentNullException.ThrowIfNull(tag);
-
             if (key.Length != KeySize)
                 throw new ArgumentException($"An AES-256 key must be exactly {KeySize} bytes long.");
             if (nonce.Length != NonceSize)

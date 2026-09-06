@@ -13,5 +13,10 @@ namespace PasswordBank.Cryptography
 
             return RandomNumberGenerator.GetBytes(length);
         }
+
+        public static void Fill(Span<byte> destination)
+        {
+            RandomNumberGenerator.Fill(destination);
+        }
     }
 }
