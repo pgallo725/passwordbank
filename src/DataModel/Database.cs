@@ -55,6 +55,9 @@ namespace PasswordBank.DataModel
             };
             var database = new Database(new SqliteConnection(builder.ConnectionString));
 
+            byte[] verificationSalt = ArrayPool<byte>.Shared.Rent(PBKDF2.SaltSize);
+            byte[] encryptionSalt = ArrayPool<byte>.Shared.Rent(PBKDF2.SaltSize);
+            byte[] masterPasswordHash = ArrayPool<byte>.Shared.Rent(PBKDF2.OutputSize);
             try
             {
                 database.connection.Open();
@@ -86,9 +89,8 @@ namespace PasswordBank.DataModel
                 command.ExecuteNonQuery();
 
                 // Generate the master salts and the master password hash
-                byte[] verificationSalt = Cryptography.Random.GenerateBytes(PBKDF2.SaltSize);
-                byte[] encryptionSalt = Cryptography.Random.GenerateBytes(PBKDF2.SaltSize);
-                byte[] masterPasswordHash = new byte[PBKDF2.OutputSize];
+                Cryptography.Random.Fill(verificationSalt);
+                Cryptography.Random.Fill(encryptionSalt);
                 PBKDF2.GenerateKey(password, verificationSalt, masterPasswordHash);
 
                 byte[] databaseVersion = BitConverter.GetBytes(1);
@@ -144,6 +146,17 @@ namespace PasswordBank.DataModel
                     File.Delete(DatabaseFilePath);
                 }
                 throw;
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(verificationSalt);
+                ArrayPool<byte>.Shared.Return(verificationSalt);
+
+                CryptographicOperations.ZeroMemory(encryptionSalt);
+                ArrayPool<byte>.Shared.Return(encryptionSalt);
+
+                CryptographicOperations.ZeroMemory(masterPasswordHash);
+                ArrayPool<byte>.Shared.Return(masterPasswordHash);
             }
         }
 
