@@ -27,7 +27,7 @@ namespace PasswordBank.DataModel
             };
         }
 
-        public EncryptedCredential Encrypt(KeyGenerator keygen, string password)
+        public EncryptedCredential Encrypt(KeyGenerator keygen, ReadOnlySpan<char> password)
         {
             byte[] buffer = ArrayPool<byte>.Shared.Rent(AES256.KeySize);
             try
@@ -78,7 +78,7 @@ namespace PasswordBank.DataModel
             };
         }
 
-        public PlaintextCredential Decrypt(KeyGenerator keygen, string password)
+        public PlaintextCredential Decrypt(KeyGenerator keygen, ReadOnlySpan<char> password)
         {
             byte[] buffer = ArrayPool<byte>.Shared.Rent(AES256.KeySize);
             try

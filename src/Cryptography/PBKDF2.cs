@@ -11,9 +11,10 @@ namespace PasswordBank.Cryptography
         public const int SaltSize = 16; /* 16 bytes */
         public const int OutputSize = 32; /* 256 bits */
 
-        public static void GenerateKey(string password, ReadOnlySpan<byte> salt, Span<byte> destination)
+        public static void GenerateKey(ReadOnlySpan<char> password, ReadOnlySpan<byte> salt, Span<byte> destination)
         {
-            ArgumentException.ThrowIfNullOrEmpty(password);
+            if (password.IsEmpty)
+                throw new ArgumentException("Value cannot be an empty ReadOnlySpan<char>.", nameof(password));
 
             if (salt.Length < SaltSize)
                 throw new ArgumentException($"PBKDF2 requires at least {SaltSize} bytes of salt", nameof(salt));
