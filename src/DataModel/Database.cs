@@ -343,9 +343,9 @@ namespace PasswordBank.DataModel
             using var reader = command.ExecuteReader();
 
             // Allocate buffers from a pool to store all the temporary data used by this function
-            byte[] bufferInputHash = ArrayPool<byte>.Shared.Rent(PBKDF2.OutputSize);
-            byte[] bufferMasterHash = ArrayPool<byte>.Shared.Rent(PBKDF2.OutputSize);
-            byte[] bufferSalt = ArrayPool<byte>.Shared.Rent(PBKDF2.SaltSize);
+            byte[] inputPasswordHash = ArrayPool<byte>.Shared.Rent(PBKDF2.OutputSize);
+            byte[] masterPasswordHash = ArrayPool<byte>.Shared.Rent(PBKDF2.OutputSize);
+            byte[] verificationSalt = ArrayPool<byte>.Shared.Rent(PBKDF2.SaltSize);
             try
             {
                 bool hasMasterHash = false;
@@ -356,13 +356,13 @@ namespace PasswordBank.DataModel
                     switch (reader.GetString(0))
                     {
                         case "MasterPasswordHash":
-                            if (reader.GetBytes(1, 0, bufferMasterHash, 0, PBKDF2.OutputSize) != PBKDF2.OutputSize)
+                            if (reader.GetBytes(1, 0, masterPasswordHash, 0, PBKDF2.OutputSize) != PBKDF2.OutputSize)
                                 throw new ApplicationException("Invalid master password hash retrieved from the database.");
                             hasMasterHash = true;
                             break;
 
                         case "VerificationSalt":
-                            if (reader.GetBytes(1, 0, bufferSalt, 0, PBKDF2.SaltSize) != PBKDF2.SaltSize)
+                            if (reader.GetBytes(1, 0, verificationSalt, 0, PBKDF2.SaltSize) != PBKDF2.SaltSize)
                                 throw new ApplicationException("Invalid password verification salt retrieved from the database.");
                             hasSalt = true;
                             break;
@@ -377,23 +377,19 @@ namespace PasswordBank.DataModel
                 if (!hasSalt || !hasMasterHash)
                     throw new ApplicationException("Missing fields in database 'ServiceData' table.");
 
-                Span<byte> inputPasswordHash = bufferInputHash.AsSpan(0, PBKDF2.OutputSize);
-                Span<byte> masterPasswordHash = bufferInputHash.AsSpan(0, PBKDF2.OutputSize);
-                Span<byte> verificationSalt = bufferInputHash.AsSpan(0, PBKDF2.SaltSize);
-
                 PBKDF2.GenerateKey(password, verificationSalt, inputPasswordHash);
                 return Hash.Equals(inputPasswordHash, masterPasswordHash);
             }
             finally
             {
-                CryptographicOperations.ZeroMemory(bufferInputHash);
-                ArrayPool<byte>.Shared.Return(bufferInputHash);
+                CryptographicOperations.ZeroMemory(inputPasswordHash);
+                ArrayPool<byte>.Shared.Return(inputPasswordHash);
 
-                CryptographicOperations.ZeroMemory(bufferMasterHash);
-                ArrayPool<byte>.Shared.Return(bufferMasterHash);
+                CryptographicOperations.ZeroMemory(masterPasswordHash);
+                ArrayPool<byte>.Shared.Return(masterPasswordHash);
 
-                CryptographicOperations.ZeroMemory(bufferSalt);
-                ArrayPool<byte>.Shared.Return(bufferSalt);
+                CryptographicOperations.ZeroMemory(verificationSalt);
+                ArrayPool<byte>.Shared.Return(verificationSalt);
             }
         }
 
@@ -612,16 +608,13 @@ namespace PasswordBank.DataModel
 
             // Generate the hash for verifying the new master password
             byte[] verificationSalt = GetVerificationSalt();
-            byte[] bufferHash = ArrayPool<byte>.Shared.Rent(PBKDF2.OutputSize);
-            Span<byte> newPasswordHash = bufferHash.AsSpan(0, PBKDF2.OutputSize);
+            byte[] newPasswordHash = ArrayPool<byte>.Shared.Rent(PBKDF2.OutputSize);
             PBKDF2.GenerateKey(newPassword, verificationSalt, newPasswordHash);
 
             // Generate the keys only once before the loop over all database records
             KeyGenerator keygen = GetKeyGenerator();
-            byte[] bufferOldKey = ArrayPool<byte>.Shared.Rent(AES256.KeySize);
-            byte[] bufferNewKey = ArrayPool<byte>.Shared.Rent(AES256.KeySize);
-            Span<byte> oldEncryptionKey = bufferOldKey.AsSpan(0, AES256.KeySize);
-            Span<byte> newEncryptionKey = bufferNewKey.AsSpan(0, AES256.KeySize);
+            byte[] oldEncryptionKey = ArrayPool<byte>.Shared.Rent(AES256.KeySize);
+            byte[] newEncryptionKey = ArrayPool<byte>.Shared.Rent(AES256.KeySize);
             keygen.GetKey(oldPassword, oldEncryptionKey);
             keygen.GetKey(newPassword, newEncryptionKey);
 
@@ -685,14 +678,14 @@ namespace PasswordBank.DataModel
             }
             finally
             {
-                CryptographicOperations.ZeroMemory(bufferOldKey);
-                ArrayPool<byte>.Shared.Return(bufferOldKey);
+                CryptographicOperations.ZeroMemory(oldEncryptionKey);
+                ArrayPool<byte>.Shared.Return(oldEncryptionKey);
 
-                CryptographicOperations.ZeroMemory(bufferNewKey);
-                ArrayPool<byte>.Shared.Return(bufferNewKey);
+                CryptographicOperations.ZeroMemory(newEncryptionKey);
+                ArrayPool<byte>.Shared.Return(newEncryptionKey);
 
-                CryptographicOperations.ZeroMemory(bufferHash);
-                ArrayPool<byte>.Shared.Return(bufferHash);
+                CryptographicOperations.ZeroMemory(newPasswordHash);
+                ArrayPool<byte>.Shared.Return(newPasswordHash);
             }
         }
     }
