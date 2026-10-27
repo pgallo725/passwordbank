@@ -1,6 +1,7 @@
 ﻿using PasswordBank.DataModel;
 using PasswordBank.UI;
 using Spectre.Console;
+using System.Diagnostics;
 
 namespace PasswordBank;
 
@@ -93,12 +94,15 @@ internal partial class Program
                         {
                             MainMenuAction.View => ListCredentials(),
                             MainMenuAction.Search => SearchCredentials(),
-                            _ => null
+                            _ => throw new UnreachableException()
                         };
-                        ConsoleHelper.RestoreCheckpoint();
-
-                        if (credentials is null)
+                        if (credentials is null)  // (authentication failed)
+                        {
+                            ContinuationPrompt();
+                            ConsoleHelper.RestoreCheckpoint();
                             break;
+                        }
+                        ConsoleHelper.RestoreCheckpoint();
 
                         if (credentials.Count == 0)
                         {
@@ -142,10 +146,24 @@ internal partial class Program
 
                             switch (credentialAction)
                             {
-                                case CredentialAction.View:   ViewCredential(credential);                 break;
-                                case CredentialAction.Edit:   EditCredential(credential);                 break;
-                                case CredentialAction.Delete: DeleteCredential(credential, credentials);  break;
-                                case CredentialAction.Cancel: /* nothing to do, show the previous menu */ break;
+                                case CredentialAction.View:
+                                    ViewCredential(credential);
+                                    ContinuationPrompt();
+                                    break;
+
+                                case CredentialAction.Edit:
+                                    EditCredential(credential);
+                                    ContinuationPrompt();
+                                    break;
+
+                                case CredentialAction.Delete:
+                                    DeleteCredential(credential, credentials);
+                                    ContinuationPrompt();
+                                    break;
+
+                                case CredentialAction.Cancel:
+                                    /* Nothing to do, show the previous menu */
+                                    break;
                             }
                             // Clear everything before showing the (updated) list of credentials again
                             ConsoleHelper.RestoreCheckpoint();
@@ -154,10 +172,12 @@ internal partial class Program
 
                     case MainMenuAction.Add:
                         AddCredential();
+                        ContinuationPrompt();
                         break;
 
                     case MainMenuAction.ChangePassword:
                         ChangeMasterPassword();
+                        ContinuationPrompt();
                         break;
 
                     case MainMenuAction.Quit:

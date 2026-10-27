@@ -1,7 +1,9 @@
 ﻿using Microsoft.Data.Sqlite;
-using PasswordBank.Cryptography;
 using System.Buffers;
+using System.Text;
 using System.Security.Cryptography;
+using PasswordBank.Cryptography;
+using static SQLitePCL.raw;
 
 namespace PasswordBank.DataModel
 {
@@ -20,7 +22,7 @@ namespace PasswordBank.DataModel
         /// This text is appended to the 'Data Source' field in the connection string<br/>
         /// to select the cipher scheme used for encrypting the database connection.
         /// </summary>
-        private static readonly string CipherString = "cipher=chacha20";   // uses ChaCha20 encryption + Poly1305 HMAC
+        private static readonly string CipherString = "cipher=chacha20";   // use ChaCha20 encryption + Poly1305 HMAC
 
 
         private readonly SqliteConnection connection;
@@ -36,22 +38,45 @@ namespace PasswordBank.DataModel
         }
 
 
+        private static void ApplyDatabasePassword(SqliteConnection connection, SecretString password)
+        {
+            int nKeyBytes = Encoding.UTF8.GetByteCount(password.GetData());
+            byte[] keyBytes = ArrayPool<byte>.Shared.Rent(nKeyBytes);
+            try
+            {
+                // SQLite3 Multiple Ciphers recommends UTF-8 encoding for passphrases
+                Encoding.UTF8.GetBytes(password.GetData(), keyBytes);
+
+                var db = connection.Handle;
+                int code = sqlite3_key(db, keyBytes);
+                if (code != SQLITE_OK)
+                    throw new SqliteException($"sqlite3_key() failed with error code {code}.",
+                        code, sqlite3_extended_errcode(db));
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(keyBytes);
+                ArrayPool<byte>.Shared.Return(keyBytes);
+            }
+        }
+
+
         /// <summary>
         /// Create and initialize an encrypted credentials database at the default location.
         /// </summary>
         /// <param name="password">The password to use for encrypting the database.</param>
         /// <exception cref="ApplicationException"></exception>
-        public static Database Create(string password)
+        public static Database Create(SecretString password)
         {
             if (File.Exists(DatabaseFilePath))
                 throw new ApplicationException("Database file already exists.");
 
-            ArgumentException.ThrowIfNullOrEmpty(password);
+            if (password is null || password.GetLength() == 0)
+                throw new ArgumentException("Value cannot be a null or empty SecretString.", nameof(password));
 
             var builder = new SqliteConnectionStringBuilder
             {
-                DataSource = $"file:{DatabaseFilePath}?{CipherString}",
-                Password = password
+                DataSource = $"file:{DatabaseFilePath}?{CipherString}"
             };
             var database = new Database(new SqliteConnection(builder.ConnectionString));
 
@@ -61,6 +86,7 @@ namespace PasswordBank.DataModel
             try
             {
                 database.connection.Open();
+                ApplyDatabasePassword(database.connection, password);
 
                 // Create the CREDENTIALS table
                 var command = database.connection.CreateCommand();
@@ -91,7 +117,7 @@ namespace PasswordBank.DataModel
                 // Generate the master salts and the master password hash
                 Cryptography.Random.Fill(verificationSalt);
                 Cryptography.Random.Fill(encryptionSalt);
-                PBKDF2.GenerateKey(password, verificationSalt, masterPasswordHash);
+                PBKDF2.GenerateKey(password.GetData(), verificationSalt, masterPasswordHash);
 
                 byte[] databaseVersion = BitConverter.GetBytes(1);
                 if (!BitConverter.IsLittleEndian)
@@ -167,17 +193,17 @@ namespace PasswordBank.DataModel
         /// <param name="password">The password used to encrypt the database.</param>
         /// <returns>A reference to the opened database if the password was correct, otherwise null.</returns>
         /// <exception cref="ApplicationException"></exception>
-        public static Database? Open(string password)
+        public static Database? Open(SecretString password)
         {
             if (!File.Exists(DatabaseFilePath))
                 throw new ApplicationException("Database file not found.");
 
-            ArgumentException.ThrowIfNullOrEmpty(password);
+            if (password is null || password.GetLength() == 0)
+                throw new ArgumentException("Value cannot be a null or empty SecretString.", nameof(password));
 
             var builder = new SqliteConnectionStringBuilder
             {
-                DataSource = $"file:{DatabaseFilePath}?{CipherString}",
-                Password = password
+                DataSource = $"file:{DatabaseFilePath}?{CipherString}"
             };
             var database = new Database(new SqliteConnection(builder.ConnectionString));
 
@@ -185,6 +211,7 @@ namespace PasswordBank.DataModel
             {
                 // See note in the 'catch' block below
                 database.connection.Open();
+                ApplyDatabasePassword(database.connection, password);
 
                 // Validate the database schema by checking the presence of the required tables
                 var command = database.connection.CreateCommand();
@@ -330,9 +357,10 @@ namespace PasswordBank.DataModel
         /// </summary>
         /// <param name="password">The password to verify.</param>
         /// <returns>A boolean value indicating whether the password passed the verification or not.</returns>
-        public bool VerifyPassword(string password)
+        public bool VerifyPassword(SecretString password)
         {
-            ArgumentException.ThrowIfNullOrEmpty(password);
+            if (password is null || password.GetLength() == 0)
+                throw new ArgumentException("Value cannot be a null or empty SecretString.", nameof(password));
 
             using var command = connection.CreateCommand();
             command.CommandText = """
@@ -377,7 +405,7 @@ namespace PasswordBank.DataModel
                 if (!hasSalt || !hasMasterHash)
                     throw new ApplicationException("Missing fields in database 'ServiceData' table.");
 
-                PBKDF2.GenerateKey(password, verificationSalt, inputPasswordHash);
+                PBKDF2.GenerateKey(password.GetData(), verificationSalt, inputPasswordHash);
                 return Hash.Equals(inputPasswordHash, masterPasswordHash);
             }
             finally
@@ -584,10 +612,12 @@ namespace PasswordBank.DataModel
         /// <param name="oldPassword">The password previously used to encrypt the database.</param>
         /// <param name="newPassword">The new password to use.</param>
         /// <returns>A boolean value indicating whether the operation succeeded or not.</returns>
-        public bool ChangePassword(string oldPassword, string newPassword)
+        public bool ChangePassword(SecretString oldPassword, SecretString newPassword)
         {
-            ArgumentException.ThrowIfNullOrEmpty(oldPassword);
-            ArgumentException.ThrowIfNullOrEmpty(newPassword);
+            if (oldPassword is null || oldPassword.GetLength() == 0)
+                throw new ArgumentException("Value cannot be a null or empty SecretString.", nameof(oldPassword));
+            if (newPassword is null || newPassword.GetLength() == 0)
+                throw new ArgumentException("Value cannot be a null or empty SecretString.", nameof(newPassword));
 
             List<EncryptedCredential> credentials = GetCredentials();
 
@@ -609,14 +639,14 @@ namespace PasswordBank.DataModel
             // Generate the hash for verifying the new master password
             byte[] verificationSalt = GetVerificationSalt();
             byte[] newPasswordHash = ArrayPool<byte>.Shared.Rent(PBKDF2.OutputSize);
-            PBKDF2.GenerateKey(newPassword, verificationSalt, newPasswordHash);
+            PBKDF2.GenerateKey(newPassword.GetData(), verificationSalt, newPasswordHash);
 
             // Generate the keys only once before the loop over all database records
             KeyGenerator keygen = GetKeyGenerator();
             byte[] oldEncryptionKey = ArrayPool<byte>.Shared.Rent(AES256.KeySize);
             byte[] newEncryptionKey = ArrayPool<byte>.Shared.Rent(AES256.KeySize);
-            keygen.GetKey(oldPassword, oldEncryptionKey);
-            keygen.GetKey(newPassword, newEncryptionKey);
+            keygen.GetKey(oldPassword.GetData(), oldEncryptionKey);
+            keygen.GetKey(newPassword.GetData(), newEncryptionKey);
 
             try
             {
@@ -624,8 +654,9 @@ namespace PasswordBank.DataModel
                 int updated = 0;
                 foreach (EncryptedCredential oldEncryptedCredential in credentials)
                 {
-                    PlaintextCredential plaintextCredential = oldEncryptedCredential.Decrypt(oldEncryptionKey);
+                    using PlaintextCredential plaintextCredential = oldEncryptedCredential.Decrypt(oldEncryptionKey);
                     EncryptedCredential newEncryptedCredential = plaintextCredential.Encrypt(newEncryptionKey);
+                    plaintextCredential.Password.Zeroise(); // remove plaintext secrets from memory immediately
 
                     command.Parameters[0].Value = newEncryptedCredential.EncryptionNonce;
                     command.Parameters[1].Value = newEncryptedCredential.EncryptedPassword;
@@ -651,21 +682,23 @@ namespace PasswordBank.DataModel
                 }
                 else // finally, change the SQLite encryption key and password as well
                 {
-                    // NOTE: SQLite doesn't support parameters in PRAGMA statements.
-                    //  Instead, we use the quote() function to prevent SQL injection.
-                    using var pragma = connection.CreateCommand();
-                    pragma.CommandText = "SELECT quote($newPassword);";
-                    pragma.Parameters.AddWithValue("$newPassword", newPassword);
-                    if (pragma.ExecuteScalar() is string quotedNewPassword)
+                    int nKeyBytes = Encoding.ASCII.GetByteCount(newPassword.GetData());
+                    byte[] keyBytes = ArrayPool<byte>.Shared.Rent(nKeyBytes);
+                    try
                     {
-                        pragma.CommandText = $"PRAGMA rekey = {quotedNewPassword}";
-                        pragma.Parameters.Clear();
-                        pragma.ExecuteNonQuery();
+                        // SQLite3 Multiple Ciphers recommends UTF-8 encoding for passphrases
+                        Encoding.UTF8.GetBytes(newPassword.GetData(), keyBytes);
+
+                        var db = connection.Handle;
+                        int code = sqlite3_rekey(db, keyBytes);
+                        if (code != SQLITE_OK)
+                            throw new SqliteException($"sqlite3_rekey() failed with error code {code}.",
+                                code, sqlite3_extended_errcode(db));
                     }
-                    else
+                    finally
                     {
-                        transaction.Rollback();
-                        return false;
+                        CryptographicOperations.ZeroMemory(keyBytes);
+                        ArrayPool<byte>.Shared.Return(keyBytes);
                     }
                 }
                 transaction.Commit();

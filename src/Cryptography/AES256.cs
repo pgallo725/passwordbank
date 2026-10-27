@@ -13,17 +13,17 @@ namespace PasswordBank.Cryptography
         public const int NonceSize = 12; /* 96 bits */
         public const int TagSize = 16; /* 128 bits */
 
-        public static (byte[], byte[]) Encrypt(string plaintext, ReadOnlySpan<byte> key, ReadOnlySpan<byte> nonce)
+        public static (byte[], byte[]) Encrypt(ReadOnlySpan<char> plaintext, ReadOnlySpan<byte> key, ReadOnlySpan<byte> nonce)
         {
-            ArgumentException.ThrowIfNullOrEmpty(plaintext);
-
             if (key.Length != KeySize)
                 throw new ArgumentException($"An AES-256 key must be exactly {KeySize} bytes long.");
             if (nonce.Length != NonceSize)
                 throw new ArgumentException($"An AES-256-GCM nonce must be exactly {NonceSize} bytes long.");
 
-            byte[] bytes = Encoding.Unicode.GetBytes(plaintext);
+            int nBytes = Encoding.Unicode.GetByteCount(plaintext);
+            byte[] bytes = GC.AllocateUninitializedArray<byte>(nBytes); 
             byte[] authenticationTag = GC.AllocateUninitializedArray<byte>(TagSize);
+            Encoding.Unicode.GetBytes(plaintext, bytes);
 
             using var aes256gcm = new AesGcm(key, TagSize);
             aes256gcm.Encrypt(nonce, bytes, bytes, authenticationTag);  // use the same buffer as input and output
@@ -31,7 +31,7 @@ namespace PasswordBank.Cryptography
             return (bytes /* ciphertext */, authenticationTag);
         }
 
-        public static string Decrypt(ReadOnlySpan<byte> ciphertext, ReadOnlySpan<byte> key, ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> tag)
+        public static char[] Decrypt(ReadOnlySpan<byte> ciphertext, ReadOnlySpan<byte> key, ReadOnlySpan<byte> nonce, ReadOnlySpan<byte> tag)
         {
             if (key.Length != KeySize)
                 throw new ArgumentException($"An AES-256 key must be exactly {KeySize} bytes long.");
@@ -45,10 +45,9 @@ namespace PasswordBank.Cryptography
             try
             {
                 using var aes256gcm = new AesGcm(key, TagSize);
-                aes256gcm.Decrypt(nonce, ciphertext, tag, buffer.AsSpan(0, ciphertext.Length));
+                aes256gcm.Decrypt(nonce, ciphertext, tag, buffer);
 
-                string plaintext = Encoding.Unicode.GetString(buffer.AsSpan(0, ciphertext.Length));
-                return plaintext;
+                return Encoding.Unicode.GetChars(buffer /* plaintext */);
             }
             finally
             {

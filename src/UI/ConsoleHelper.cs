@@ -1,27 +1,33 @@
-﻿using System.Text;
+﻿using System.Buffers;
+using System.Text;
 using Spectre.Console;
+using PasswordBank.DataModel;
 
 namespace PasswordBank.UI
 {
     internal class ConsoleHelper
     {
-        public static string SafeInput()
+        public static SecretString SecretTextInput(SecretString? initialString = null)
         {
-            int i = 0;
-            char[] input = new char[256];
+            const int MAX_SECRET_LENGTH = 256;
+            char[] input = ArrayPool<char>.Shared.Rent(MAX_SECRET_LENGTH);
+            int length = 0;
+
+            // If an initial value is provided, copy it into the working buffer
+            if (!SecretString.IsNullOrEmpty(initialString))
+            {
+                initialString.GetData().CopyTo(input.AsSpan());
+                for (length = 0; length < initialString.GetLength(); length++)
+                    Console.Write('*');
+            }
             
-            while (i < input.Length)
+            while (true)
             {
                 ConsoleKeyInfo keypress = Console.ReadKey(true);
                 char keyChar = keypress.KeyChar;
 
                 // Skip unsupported modifiers
-                if ((keypress.Modifiers & ConsoleModifiers.Alt) == ConsoleModifiers.Alt ||
-                    (keypress.Modifiers & ConsoleModifiers.Control) == ConsoleModifiers.Control)
-                    continue;
-
-                // Skip keys that do not map to Unicode characters
-                if (keyChar == '\u0000')
+                if ((keypress.Modifiers & (ConsoleModifiers.Alt | ConsoleModifiers.Control)) != 0)
                     continue;
 
                 // Handle Enter keypress
@@ -31,26 +37,34 @@ namespace PasswordBank.UI
                 // Handle Backspace keypress
                 if (keypress.Key == ConsoleKey.Backspace)
                 {
-                    if (i >= 1)
+                    if (length > 0)
                     {
                         Console.CursorLeft -= 1;
                         Console.Write(' ');
                         Console.CursorLeft -= 1;
-                        i--;
+                        length--;
                     }
                     continue;
                 }
 
+                // Skip non-ASCII or invalid characters
+                if (keyChar == '\u0000' || !char.IsAscii(keyChar))
+                    continue;
+
                 // Add regular ASCII characters to the string and echo a '*'
-                if (keyChar > 31 && keyChar < 128)
+                if (length < MAX_SECRET_LENGTH)
                 {
-                    input[i++] = keyChar;
+                    input[length++] = keyChar;
                     Console.Write('*');
                 }
             }
-            Console.Write('\n');
 
-            return new string(input, 0, i);
+            char[] data = GC.AllocateUninitializedArray<char>(length); ;
+            input.AsSpan(0, length).CopyTo(data);
+            input.AsSpan().Clear();
+            ArrayPool<char>.Shared.Return(input);
+
+            return new SecretString(data);
         }
 
 

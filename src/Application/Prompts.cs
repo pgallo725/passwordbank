@@ -10,9 +10,9 @@ internal partial class Program
     /// <summary>
     /// Prompts the user to input the master password and then verifies its correctness against the database.
     /// </summary>
-    /// <param name="password">The user-provided password (regardless of its correctness).</param>
+    /// <param name="inputPassword">The user-provided password (regardless of its correctness).</param>
     /// <returns>An open connection to the credentials database in case of success, otherwise null.</returns>
-    internal static Database? AuthenticationPrompt(out string password)
+    internal static Database? AuthenticationPrompt(out SecretString inputPassword)
     {
         // Action title
         AnsiConsole.Markup($"[{ColorPalette.NEUTRAL}]>> AUTHENTICATION[/]");
@@ -22,21 +22,19 @@ internal partial class Program
         AnsiConsole.Write('\n');
         AnsiConsole.Write('\n');
 
-        password = AnsiConsole.Prompt(
-            new TextPrompt<string>($"Insert your [{ColorPalette.SECONDARY} slowblink]master password[/]: ")
-                .Secret()
-                .ClearOnFinish(false)
-            );
+        AnsiConsole.Markup($"Insert your [{ColorPalette.SECONDARY} slowblink]master password[/]: ");
+        inputPassword = ConsoleHelper.SecretTextInput();
+        AnsiConsole.Write('\n');
 
         Database? database;
         bool isCorrectPassword;
         try
         {
             // Open the database connection with the provided password
-            database = Database.Open(password);
+            database = Database.Open(inputPassword);
 
             // Check the password against the key stored in the database
-            isCorrectPassword = database?.VerifyPassword(password) ?? false;
+            isCorrectPassword = database?.VerifyPassword(inputPassword) ?? false;
         }
         finally  // ensure this is executed even if the code above throws
         {
@@ -107,6 +105,42 @@ internal partial class Program
                 // for the existing prompt, so that the user can edit in-place
                 AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}]{errorMessage ?? string.Empty}[/]");
                 prompt.DefaultValue(input);
+                Console.SetCursorPosition(column, row); // the updated prompt will cover the existing text perfectly
+            }
+            else
+            {
+                Console.SetCursorPosition(0, row + 1);
+                AnsiConsole.Write(new string(' ', Console.BufferWidth));  // clear error line
+                Console.SetCursorPosition(0, row + 1);
+                return input;
+            }
+        }
+    }
+
+
+    internal static SecretString ValidatedSecretPrompt(string title, IValidator validator, SecretString? editableValue = null)
+    {
+        // Store the row number before the prompt
+        (int column, int row) = Console.GetCursorPosition();
+
+        while (true)
+        {
+            // Write prompt title
+            AnsiConsole.Markup(title);
+            AnsiConsole.Write(' ');
+
+            // Get secret user input
+            SecretString input = ConsoleHelper.SecretTextInput(editableValue);
+            editableValue?.Zeroise();
+
+            (bool isValid, string? errorMessage) = validator.Validate(input);
+            if (!isValid)
+            {
+                // Print error message and set the current input as the default value
+                // for the existing prompt, so that the user can edit in-place
+                Console.SetCursorPosition(0, row + 1);
+                AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}]{errorMessage ?? string.Empty}[/]");
+                editableValue = input;
                 Console.SetCursorPosition(column, row); // the updated prompt will cover the existing text perfectly
             }
             else

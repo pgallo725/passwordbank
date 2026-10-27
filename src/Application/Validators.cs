@@ -10,6 +10,7 @@ namespace PasswordBank.Application
     internal interface IValidator
     {
         public (bool, string?) Validate(string value);
+        public (bool, string?) Validate(SecretString value);
     }
 
 
@@ -19,6 +20,11 @@ namespace PasswordBank.Application
     internal class NullValidator : IValidator
     {
         public (bool, string?) Validate(string value)
+        {
+            return (true, string.Empty);
+        }
+
+        public (bool, string?) Validate(SecretString value)
         {
             return (true, string.Empty);
         }
@@ -33,6 +39,13 @@ namespace PasswordBank.Application
         public (bool, string?) Validate(string value)
         {
             if (value.Length > 256)
+                return (false, "The input length is limited to a maximum of 256 characters.");
+            return (true, string.Empty);
+        }
+
+        public (bool, string?) Validate(SecretString value)
+        {
+            if (value.GetLength() > 256)
                 return (false, "The input length is limited to a maximum of 256 characters.");
             return (true, string.Empty);
         }
@@ -52,6 +65,12 @@ namespace PasswordBank.Application
             else if (MailAddress.TryCreate(emailAddress, out var _))
                 return (true, string.Empty);
             else return (false, "The input does not match the format of a valid email address.");
+        }
+
+        public (bool, string?) Validate(SecretString value)
+        {
+            // EmailAddressValidator should never be used with SecretString objects
+            throw new NotImplementedException();
         }
     }
 
@@ -75,6 +94,12 @@ namespace PasswordBank.Application
                 return (false, "An account with the same name already exists in the database.");
             else return (true, string.Empty);
         }
+
+        public virtual (bool, string?) Validate(SecretString value)
+        {
+            // AccountNameValidator should never be used with SecretString objects
+            throw new NotImplementedException();
+        }
     }
 
 
@@ -94,6 +119,12 @@ namespace PasswordBank.Application
                 return (true, string.Empty);
             else return base.Validate(accountName);
         }
+
+        public override (bool, string?) Validate(SecretString value)
+        {
+            // AccountNameEditValidator should never be used with SecretString objects
+            throw new NotImplementedException();
+        }
     }
 
 
@@ -104,12 +135,18 @@ namespace PasswordBank.Application
     {
         public (bool, string?) Validate(string password)
         {
+            // PasswordValidator should NEVER be used with plain .NET strings
+            throw new NotImplementedException();
+        }
+
+        public (bool, string?) Validate(SecretString password)
+        {
             // Check that the password is not empty/whitespace and contains atleast 3 characters
-            if (string.IsNullOrWhiteSpace(password))
+            if (SecretString.IsNullOrWhiteSpace(password))
                 return (false, "A password must not be empty or made only of whitespace characters.");
-            else if (password.Length > 256)
+            else if (password.GetLength() > 256)
                 return (false, "The input length is limited to a maximum of 256 characters.");
-            else if (password.Length < 3)
+            else if (password.GetLength() < 3)
                 return (false, "A password must contain at least 3 characters.");
             else return (true, string.Empty);
         }
@@ -138,7 +175,13 @@ namespace PasswordBank.Application
              'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
         );
 
-        public (bool, string?) Validate(string masterPassword)
+        public (bool, string?) Validate(string password)
+        {
+            // MasterPasswordValidator should NEVER be used with plain .NET strings
+            throw new NotImplementedException();
+        }
+
+        public (bool, string?) Validate(SecretString masterPassword)
         {
             /* Check that the master password satisfies the following password strength requirements:
              *  - At least 8 characters long
@@ -146,11 +189,11 @@ namespace PasswordBank.Application
              *  - At least 1 uppercase letter
              *  - At least 1 digit character
              */
-            if (string.IsNullOrWhiteSpace(masterPassword))
+            if (SecretString.IsNullOrWhiteSpace(masterPassword))
                 return (false, "A password must not be empty or made only of whitespace characters.");
-            else if (masterPassword.Length > 256)
+            else if (masterPassword.GetLength() > 256)
                 return (false, "The input length is limited to a maximum of 256 characters.");
-            else if (masterPassword.Length < 8)
+            else if (masterPassword.GetLength() < 8)
                 return (false, "The master password must be at least 8 characters long.");
             else if (!masterPassword.ContainsAny(lowercase))
                 return (false, "The master password must contain at least 1 lowercase letter.");
