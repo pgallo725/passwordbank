@@ -98,12 +98,12 @@ internal partial class Program
             if (string.IsNullOrEmpty(input) && prompt.AllowEmpty)
                 return input;
 
-            (bool isValid, string? errorMessage) = validator.Validate(input);
-            if (!isValid)
+            ValidationResult result = validator.Validate(input);
+            if (!result.Successful)
             {
                 // Print error message and set the current input as the default value
                 // for the existing prompt, so that the user can edit in-place
-                AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}]{errorMessage ?? string.Empty}[/]");
+                AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}]{result.Message ?? string.Empty}[/]");
                 prompt.DefaultValue(input);
                 Console.SetCursorPosition(column, row); // the updated prompt will cover the existing text perfectly
             }
@@ -133,13 +133,13 @@ internal partial class Program
             SecretString input = ConsoleHelper.SecretTextInput(editableValue);
             editableValue?.Zeroise();
 
-            (bool isValid, string? errorMessage) = validator.Validate(input);
-            if (!isValid)
+            ValidationResult result = validator.Validate(input);
+            if (!result.Successful)
             {
                 // Print error message and set the current input as the default value
                 // for the existing prompt, so that the user can edit in-place
                 Console.SetCursorPosition(0, row + 1);
-                AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}]{errorMessage ?? string.Empty}[/]");
+                AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}]{result.Message ?? string.Empty}[/]");
                 editableValue = input;
                 Console.SetCursorPosition(column, row); // the updated prompt will cover the existing text perfectly
             }
