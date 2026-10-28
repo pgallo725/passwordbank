@@ -2,7 +2,10 @@
 
 namespace PasswordBank.Cryptography
 {
-    internal class KeyGenerator(byte[] salt)
+    /// <summary>
+    /// A simple value type that can be passed around to generate an encryption key from a password on-the-fly.
+    /// </summary>
+    internal readonly ref struct KeyGenerator(byte[] salt)
     {
         public void GetKey(ReadOnlySpan<char> password, Span<byte> destination)
         {

@@ -5,7 +5,7 @@ namespace PasswordBank.Cryptography
     /// <summary>
     /// A static utility class with cryptographically-safe hash-related functions.
     /// </summary>
-    internal class Hash
+    internal static class Hash
     {
         public static bool Equals(ReadOnlySpan<byte> firstHash, ReadOnlySpan<byte> secondHash)
         {

@@ -6,7 +6,7 @@ namespace PasswordBank.Cryptography
     /// A static utility class that provides a function to generate an encryption key<br/>
     ///  using the PBKDF2 key derivation method with some pre-defined parameters.
     /// </summary>
-    internal class PBKDF2
+    internal static class PBKDF2
     {
         public const int SaltSize = 16; /* 16 bytes */
         public const int OutputSize = 32; /* 256 bits */

@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+﻿using PasswordBank.Foundation;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -7,7 +7,7 @@ namespace PasswordBank.Cryptography
     /// <summary>
     /// A static utility class that provides functions to encrypt and decrypt data using the AES-256-GCM cryptographic algorithm.
     /// </summary>
-    internal class AES256
+    internal static class AES256
     {
         public const int KeySize = 32; /* 256 bits */
         public const int NonceSize = 12; /* 96 bits */
@@ -17,6 +17,7 @@ namespace PasswordBank.Cryptography
         {
             if (key.Length != KeySize)
                 throw new ArgumentException($"An AES-256 key must be exactly {KeySize} bytes long.");
+
             if (nonce.Length != NonceSize)
                 throw new ArgumentException($"An AES-256-GCM nonce must be exactly {NonceSize} bytes long.");
 
@@ -35,15 +36,17 @@ namespace PasswordBank.Cryptography
         {
             if (key.Length != KeySize)
                 throw new ArgumentException($"An AES-256 key must be exactly {KeySize} bytes long.");
+
             if (nonce.Length != NonceSize)
                 throw new ArgumentException($"An AES-256-GCM nonce must be exactly {NonceSize} bytes long.");
+
             if (tag.Length != TagSize)
                 throw new ArgumentException($"An AES-256-GCM tag must be exactly {TagSize} bytes long.");
 
             // Allocate decryption buffer from a pool, since it's temporary
             using PooledArray<byte> buffer = new(ciphertext.Length);
 
-                using var aes256gcm = new AesGcm(key, TagSize);
+            using var aes256gcm = new AesGcm(key, TagSize);
             aes256gcm.Decrypt(nonce, ciphertext, tag, buffer.GetData_W());
 
             int nChars = Encoding.Unicode.GetCharCount(buffer.GetData());
