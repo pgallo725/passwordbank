@@ -1,6 +1,7 @@
 ﻿using PasswordBank.Application;
 using PasswordBank.Cryptography;
 using PasswordBank.DataModel;
+using PasswordBank.Foundation;
 using PasswordBank.UI;
 using Spectre.Console;
 

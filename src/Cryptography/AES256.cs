@@ -41,20 +41,16 @@ namespace PasswordBank.Cryptography
                 throw new ArgumentException($"An AES-256-GCM tag must be exactly {TagSize} bytes long.");
 
             // Allocate decryption buffer from a pool, since it's temporary
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(ciphertext.Length);
-            try
-            {
-                using var aes256gcm = new AesGcm(key, TagSize);
-                aes256gcm.Decrypt(nonce, ciphertext, tag, buffer);
+            using PooledArray<byte> buffer = new(ciphertext.Length);
 
-                return Encoding.Unicode.GetChars(buffer /* plaintext */);
-            }
-            finally
-            {
-                // Reset the memory before returning it to the pool, to avoid leaking decrypted data
-                CryptographicOperations.ZeroMemory(buffer);
-                ArrayPool<byte>.Shared.Return(buffer);
-            }
+                using var aes256gcm = new AesGcm(key, TagSize);
+            aes256gcm.Decrypt(nonce, ciphertext, tag, buffer.GetData_W());
+
+            int nChars = Encoding.Unicode.GetCharCount(buffer.GetData());
+            char[] plaintext = GC.AllocateUninitializedArray<char>(nChars);
+            Encoding.Unicode.GetChars(buffer.GetData(), plaintext);
+
+            return plaintext;
         }
     }
 }

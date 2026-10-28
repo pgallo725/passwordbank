@@ -1,7 +1,7 @@
-﻿using System.Buffers;
+﻿using PasswordBank.Foundation;
+using System.Buffers;
 using System.Text;
 using Spectre.Console;
-using PasswordBank.DataModel;
 
 namespace PasswordBank.UI
 {
@@ -10,13 +10,13 @@ namespace PasswordBank.UI
         public static SecretString SecretTextInput(SecretString? initialString = null)
         {
             const int MAX_SECRET_LENGTH = 256;
-            char[] input = ArrayPool<char>.Shared.Rent(MAX_SECRET_LENGTH);
+            using PooledArray<char> input = new(MAX_SECRET_LENGTH);
             int length = 0;
 
             // If an initial value is provided, copy it into the working buffer
             if (!SecretString.IsNullOrEmpty(initialString))
             {
-                initialString.GetData().CopyTo(input.AsSpan());
+                initialString.GetData().CopyTo(input.GetData_W());
                 for (length = 0; length < initialString.GetLength(); length++)
                     Console.Write('*');
             }
@@ -54,15 +54,14 @@ namespace PasswordBank.UI
                 // Add regular ASCII characters to the string and echo a '*'
                 if (length < MAX_SECRET_LENGTH)
                 {
-                    input[length++] = keyChar;
+                    input.Buffer[length++] = keyChar;
                     Console.Write('*');
                 }
             }
 
-            char[] data = GC.AllocateUninitializedArray<char>(length); ;
-            input.AsSpan(0, length).CopyTo(data);
-            input.AsSpan().Clear();
-            ArrayPool<char>.Shared.Return(input);
+            char[] data = GC.AllocateUninitializedArray<char>(length);
+            input.Buffer.AsSpan(0, length).CopyTo(data);
+            input.Clear();
 
             return new SecretString(data);
         }

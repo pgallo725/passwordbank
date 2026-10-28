@@ -1,6 +1,5 @@
-﻿using System.Buffers;
-using System.Security.Cryptography;
-using PasswordBank.Cryptography;
+﻿using PasswordBank.Cryptography;
+using PasswordBank.Foundation;
 
 namespace PasswordBank.DataModel
 {
@@ -29,31 +28,23 @@ namespace PasswordBank.DataModel
 
         public EncryptedCredential Encrypt(KeyGenerator keygen, SecretString password)
         {
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(AES256.KeySize);
-            try
-            {
-                // Generate encryption key from the master password
-                Span<byte> key = buffer.AsSpan(0, AES256.KeySize);
-                keygen.GetKey(password.GetData(), key);
+            using PooledArray<byte> key = new(AES256.KeySize);
 
-                byte[] nonce = Cryptography.Random.GenerateBytes(AES256.NonceSize);
-                (byte[] ciphertext, byte[] tag) = AES256.Encrypt(Password.GetData(), key, nonce);
+            // Generate encryption key from the master password
+            keygen.GetKey(password.GetData(), key.GetData_W());
 
-                return new EncryptedCredential()
-                {
-                    Name = Name,
-                    EmailAddress = EmailAddress,
-                    Username = Username,
-                    EncryptionNonce = nonce,
-                    EncryptedPassword = ciphertext,
-                    EncryptionTag = tag
-                };
-            }
-            finally
+            byte[] nonce = Cryptography.Random.GenerateBytes(AES256.NonceSize);
+            (byte[] ciphertext, byte[] tag) = AES256.Encrypt(Password.GetData(), key.GetData(), nonce);
+
+            return new EncryptedCredential()
             {
-                CryptographicOperations.ZeroMemory(buffer);  // avoid leaking the encryption key
-                ArrayPool<byte>.Shared.Return(buffer);       // return memory to the pool
-            }
+                Name = Name,
+                EmailAddress = EmailAddress,
+                Username = Username,
+                EncryptionNonce = nonce,
+                EncryptedPassword = ciphertext,
+                EncryptionTag = tag
+            };
         }
 
         public void Dispose()
@@ -86,26 +77,18 @@ namespace PasswordBank.DataModel
 
         public PlaintextCredential Decrypt(KeyGenerator keygen, SecretString password)
         {
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(AES256.KeySize);
-            try
-            {
-                // Generate decryption key from the master password
-                Span<byte> key = buffer.AsSpan(0, AES256.KeySize);
-                keygen.GetKey(password.GetData(), key);
+            using PooledArray<byte> key = new(AES256.KeySize);
 
-                return new PlaintextCredential()
-                {
-                    Name = Name,
-                    EmailAddress = EmailAddress,
-                    Username = Username,
-                    Password = new(AES256.Decrypt(EncryptedPassword, key, EncryptionNonce, EncryptionTag)),
-                };
-            }
-            finally
+            // Generate decryption key from the master password
+            keygen.GetKey(password.GetData(), key.GetData_W());
+
+            return new PlaintextCredential()
             {
-                CryptographicOperations.ZeroMemory(buffer);  // avoid leaking the decryption key
-                ArrayPool<byte>.Shared.Return(buffer);       // return memory to the pool
-            }
+                Name = Name,
+                EmailAddress = EmailAddress,
+                Username = Username,
+                Password = new(AES256.Decrypt(EncryptedPassword, key.GetData(), EncryptionNonce, EncryptionTag)),
+            };
         }
     }
 }

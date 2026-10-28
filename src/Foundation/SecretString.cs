@@ -1,7 +1,7 @@
 ﻿using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 
-namespace PasswordBank.DataModel
+namespace PasswordBank.Foundation
 {
     /// <summary>
     /// A class to replace usage of .NET strings when storing short-lived plaintext secrets in memory.<br/>

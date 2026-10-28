@@ -1,4 +1,5 @@
 ﻿using PasswordBank.DataModel;
+using PasswordBank.Foundation;
 using Spectre.Console;
 using System.Buffers;
 using System.Net.Mail;
