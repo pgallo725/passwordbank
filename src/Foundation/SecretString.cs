@@ -109,6 +109,9 @@ namespace PasswordBank.Foundation
             CryptographicOperations.ZeroMemory(bytes);
         }
 
+        /// <summary>
+        /// Removes the secret from memory, by calling <see cref="Zeroise"/>.
+        /// </summary>
         public void Dispose()
         {
             Zeroise();
