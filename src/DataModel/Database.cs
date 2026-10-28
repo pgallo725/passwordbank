@@ -682,7 +682,7 @@ namespace PasswordBank.DataModel
                 }
                 else // finally, change the SQLite encryption key and password as well
                 {
-                    int nKeyBytes = Encoding.ASCII.GetByteCount(newPassword.GetData());
+                    int nKeyBytes = Encoding.UTF8.GetByteCount(newPassword.GetData());
                     byte[] keyBytes = ArrayPool<byte>.Shared.Rent(nKeyBytes);
                     try
                     {
