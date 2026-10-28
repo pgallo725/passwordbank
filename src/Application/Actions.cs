@@ -85,7 +85,7 @@ internal partial class Program
                 new BasicValidator()
                 );
 
-            if (masterPassword.Equals(confirmPassword))
+            if (masterPassword.ContentEquals(confirmPassword))
             {
                 bool result;
                 try
@@ -166,7 +166,7 @@ internal partial class Program
             new BasicValidator()
             );
 
-        if (newPassword.Equals(confirmPassword))
+        if (newPassword.ContentEquals(confirmPassword))
         {
             // Update the master password in the database (re-encrypt all data)
             bool updateSuccessful = database.ChangePassword(currentPassword, newPassword);

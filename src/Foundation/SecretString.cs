@@ -1,14 +1,19 @@
 ﻿using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 
 namespace PasswordBank.Foundation
 {
     /// <summary>
     /// A class to replace usage of .NET strings when storing short-lived plaintext secrets in memory.<br/>
-    /// The implementation controls the underlying string memory in order to wipe its contents
-    ///  when the secret gets disposed or is no longer needed.
+    /// The secret is automatically wiped from memory when the object is <i>disposed</i>.
     /// </summary>
-    internal class SecretString(char[] contents) : IEquatable<SecretString>, IDisposable
+    /// <remarks>
+    /// <b>NOTE:</b> To get the RAII behavior, instances of this class must be declared with <see langword="using"/>
+    ///   or stored into other objects that implement the <see cref="IDisposable"/> interface.
+    /// </remarks>
+    internal sealed class SecretString(char[] contents) : IDisposable
     {
         // Internally, simply store an array of characters
         private readonly char[] data = contents;
@@ -46,7 +51,8 @@ namespace PasswordBank.Foundation
         }
 
         /// <summary>
-        /// Checks if the provided <see cref="SecretString"/> object is null, empty or contains only whitespace characters.
+        /// Checks if the provided <see cref="SecretString"/> object is null, empty,
+        ///  or contains only whitespace characters.
         /// </summary>
         public static bool IsNullOrWhiteSpace([NotNullWhen(false)] SecretString? str)
         {
@@ -68,15 +74,10 @@ namespace PasswordBank.Foundation
             return MemoryExtensions.ContainsAny(data, searchValues);
         }
 
-        public override bool Equals(object? obj)
-        {
-            return Equals(obj as SecretString);
-        }
-
         /// <summary>
         /// Checks whether this and the specified <see cref="SecretString"/> have the same contents.
         /// </summary>
-        public bool Equals(SecretString? other)
+        public bool ContentEquals(SecretString? other)
         {
             if (other is null)
                 return false;
@@ -88,20 +89,11 @@ namespace PasswordBank.Foundation
         }
 
         /// <summary>
-        /// Serves as the default hash function.
-        /// </summary>
-        /// <returns>A hash code for the current <see cref="SecretString"/>.</returns>
-        public override int GetHashCode()
-        {
-            return data.GetHashCode();
-        }
-
-        /// <summary>
-        /// Returns a <see cref="string"/> representation of the contents of this <see cref="SecretString"/>.
+        /// Returns the content of this <see cref="SecretString"/> converted into a regular <see cref="string"/>.
         /// </summary>
         /// <remarks>
-        /// NOTE: Calling this function defeats the purpose of using a <see cref="SecretString"/> in the first place.<br/>
-        /// It's provided only for compatibility with third-party APIs that do not offer <see cref="Span&lt;char&gt;"/> alternatives.
+        /// <b>NOTE:</b> This function is provided only for compatibility with APIs
+        ///   that do not take <see cref="Span&lt;char&gt;"/> parameters.
         /// </remarks>
         public override string ToString()
         {
@@ -113,10 +105,8 @@ namespace PasswordBank.Foundation
         /// </summary>
         public void Zeroise()
         {
-            Array.Fill(data, '\0');
-
-            // Prevent the JIT from optimizing away the Array.Fill() call above
-            GC.KeepAlive(data);
+            Span<byte> bytes = MemoryMarshal.AsBytes(data.AsSpan());
+            CryptographicOperations.ZeroMemory(bytes);
         }
 
         public void Dispose()

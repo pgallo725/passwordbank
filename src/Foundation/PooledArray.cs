@@ -5,19 +5,23 @@ namespace PasswordBank.Foundation
     /// <summary>
     /// A simple value type that wraps a pool-allocated array with two main goals:
     /// <list type="number">
-    ///   <item>Provide a RAII-like mechanism for automatically renting/returning buffers from <see cref="ArrayPool&lt;T&gt;"/>,
-    ///     enabled by the <see cref="IDisposable"/> interface and the <see langword="using"/> keyword.</item>
-    ///   <item>Restrict access to the valid portion of pool-allocated arrays via <see cref="Span&lt;T&gt;"/>,
-    ///     hiding the implementation detail that such buffers could be larger than the requested size.</item>
+    ///   <item>Provide a RAII-like mechanism for automatically renting/returning buffers from
+    ///     <see cref="ArrayPool&lt;T&gt;"/>, enabled by the <see cref="IDisposable"/> interface.</item>
+    ///   <item>Provide <see cref="Span&lt;T&gt;"/> accessors to hide the fact that pool-allocated arrays
+    ///     could be larger than the requested size.</item>
     /// </list>
     /// </summary>
+    /// <remarks>
+    ///   <b>NOTE 1:</b> To get the RAII behavior, instances of this struct must be declared with the <see langword="using"/> keyword.<br/>
+    ///   <b>NOTE 2:</b> Users of this type must avoid creating multiple copies of a <see cref="PooledArray&lt;T&gt;"/> instance.
+    /// </remarks>
     /// <typeparam name="T">The type of elements in the array, must be an integral or POD type.</typeparam>
     /// <param name="size">The number of elements to allocate in this <see cref="PooledArray&lt;T&gt;"/>.</param>
     internal readonly ref struct PooledArray<T>(int size) : IDisposable
         where T : unmanaged
     {
         /// <summary>
-        /// The pool-allocated buffer backing the <see cref="PooledArray&lt;T&gt;"/>.<br/>
+        /// The pool-allocated buffer backing the <see cref="PooledArray&lt;T&gt;"/>.
         /// </summary>
         /// <remarks> NOTE: This might be larger than the requested array size.<br/>
         /// Prefer using <see cref="GetData"/> and <see cref="GetData_W"/> whenever possible.
