@@ -6,7 +6,7 @@ using static SQLitePCL.raw;
 
 namespace PasswordBank.DataModel
 {
-    internal class Database : IDisposable
+    internal sealed class Database : IDisposable
     {
         /// <summary>
         /// The (static) path to the credentials database file.
@@ -80,8 +80,11 @@ namespace PasswordBank.DataModel
                 database.connection.Open();
                 ApplyDatabasePassword(database.connection, password);
 
+                // Wrap database initialization into a single transaction, to rollback if anything fails
+                using var transaction = database.connection.BeginTransaction();
+
                 // Create the CREDENTIALS table
-                var command = database.connection.CreateCommand();
+                using var command = database.connection.CreateCommand();
                 command.CommandText = """
                     CREATE TABLE "Credentials" (
                         "AccountName"   TEXT NOT NULL,
@@ -96,7 +99,7 @@ namespace PasswordBank.DataModel
                 command.ExecuteNonQuery();
 
                 // Create the SERVICEDATA table
-                command = database.connection.CreateCommand();
+                command.Parameters.Clear();
                 command.CommandText = """
                     CREATE TABLE "ServiceData" (
                         "Name"  TEXT NOT NULL,
@@ -111,13 +114,14 @@ namespace PasswordBank.DataModel
                 Cryptography.Random.Fill(encryptionSalt.GetData_W());
                 PBKDF2.GenerateKey(password.GetData(), verificationSalt.GetData(), masterPasswordHash.GetData_W());
 
+                // Database schema version number
                 byte[] databaseVersion = BitConverter.GetBytes(1);
                 if (!BitConverter.IsLittleEndian)
                     Array.Reverse(databaseVersion); // make sure byte sequence is little endian
 
                 // Insert these values into the ServiceData table
                 int added = 0;
-                command = database.connection.CreateCommand();
+                command.Parameters.Clear();
                 command.CommandText = """
                     INSERT INTO ServiceData
                     VALUES('DatabaseVersion', $value);
@@ -125,7 +129,7 @@ namespace PasswordBank.DataModel
                 command.Parameters.AddWithValue("$value", databaseVersion);
                 added += command.ExecuteNonQuery();
 
-                command = database.connection.CreateCommand();
+                command.Parameters.Clear();
                 command.CommandText = """
                     INSERT INTO ServiceData
                     VALUES('VerificationSalt', $value);
@@ -133,7 +137,7 @@ namespace PasswordBank.DataModel
                 command.Parameters.AddWithValue("$value", verificationSalt.GetData().ToArray());
                 added += command.ExecuteNonQuery();
 
-                command = database.connection.CreateCommand();
+                command.Parameters.Clear();
                 command.CommandText = """
                     INSERT INTO ServiceData
                     VALUES('EncryptionSalt', $value);
@@ -141,7 +145,7 @@ namespace PasswordBank.DataModel
                 command.Parameters.AddWithValue("$value", encryptionSalt.GetData().ToArray());
                 added += command.ExecuteNonQuery();
 
-                command = database.connection.CreateCommand();
+                command.Parameters.Clear();
                 command.CommandText = """
                     INSERT INTO ServiceData
                     VALUES('MasterPasswordHash', $value);
@@ -150,8 +154,12 @@ namespace PasswordBank.DataModel
                 added += command.ExecuteNonQuery();
 
                 if (added != 4)
+                {
+                    transaction.Rollback();
                     throw new ApplicationException("Failed to initialize SQL tables in the database.");
+                }
 
+                transaction.Commit();
                 return database;
             }
             catch (Exception)
@@ -195,7 +203,7 @@ namespace PasswordBank.DataModel
                 ApplyDatabasePassword(database.connection, password);
 
                 // Validate the database schema by checking the presence of the required tables
-                var command = database.connection.CreateCommand();
+                using var command = database.connection.CreateCommand();
                 command.CommandText = """
                     SELECT COUNT(*)
                     FROM sqlite_schema
@@ -206,7 +214,7 @@ namespace PasswordBank.DataModel
                 // Validate the schema of these tables
                 if (found == 2)
                 {
-                    command = database.connection.CreateCommand();
+                    command.Parameters.Clear();
                     command.CommandText = """
                         SELECT COUNT(*)
                         FROM pragma_table_info('Credentials')
@@ -219,7 +227,7 @@ namespace PasswordBank.DataModel
                         """;
                     found += (long)(command.ExecuteScalar() ?? 0);  // should return 6
 
-                    command = database.connection.CreateCommand();
+                    command.Parameters.Clear();
                     command.CommandText = """
                         SELECT COUNT(*)
                         FROM pragma_table_info('ServiceData')
@@ -232,7 +240,7 @@ namespace PasswordBank.DataModel
                 // Validate the content of the ServiceData table
                 if (found == 10)
                 {
-                    command = database.connection.CreateCommand();
+                    command.Parameters.Clear();
                     command.CommandText = """
                         SELECT COUNT(*)
                         FROM ServiceData
@@ -245,7 +253,7 @@ namespace PasswordBank.DataModel
                 int version = 0;
                 if (found == 14)
                 {
-                    command = database.connection.CreateCommand();
+                    command.Parameters.Clear();
                     command.CommandText = """
                         SELECT Value
                         FROM ServiceData
@@ -447,7 +455,7 @@ namespace PasswordBank.DataModel
         public List<EncryptedCredential> Search(string searchString, int maxResults = 100)
         {
             ArgumentException.ThrowIfNullOrEmpty(searchString);
-            ArgumentOutOfRangeException.ThrowIfNegative(maxResults);
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxResults);
 
             using var command = connection.CreateCommand();
             command.CommandText = """
@@ -456,7 +464,7 @@ namespace PasswordBank.DataModel
                 """;
             using var reader = command.ExecuteReader();
 
-            var entries = new List<EncryptedCredential>(maxResults);
+            var entries = new List<EncryptedCredential>();
             while (entries.Count < maxResults && reader.Read())
             {
                 string accountName = reader.GetString(0);
