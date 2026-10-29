@@ -1,11 +1,10 @@
 ﻿using PasswordBank.Foundation;
-using System.Buffers;
 using System.Text;
 using Spectre.Console;
 
 namespace PasswordBank.UI
 {
-    internal class ConsoleHelper
+    internal static class ConsoleHelper
     {
         public static SecretString SecretTextInput(SecretString? initialString = null)
         {

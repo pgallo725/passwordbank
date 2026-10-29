@@ -5,7 +5,7 @@ namespace PasswordBank.UI
     /// <summary>
     /// Defines the colors of the color palette used for PasswordBank's console UI.
     /// </summary>
-    internal class ColorPalette
+    internal static class ColorPalette
     {
         public static readonly Color PRIMARY       = Color.Green3;
         public static readonly Color SECONDARY     = Color.DarkOrange;
@@ -19,7 +19,7 @@ namespace PasswordBank.UI
     /// <summary>
     /// Defines some Spectre.Console styles used for PasswordBank's console UI.
     /// </summary>
-    internal class Styles
+    internal static class Styles
     {
         /// <summary>
         /// Style used throughout the application for highlighting the currently selected option.
