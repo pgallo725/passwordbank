@@ -1,6 +1,7 @@
 ﻿using Microsoft.Data.Sqlite;
 using PasswordBank.Cryptography;
 using PasswordBank.Foundation;
+using System.Security.Cryptography;
 using System.Text;
 using static SQLitePCL.raw;
 
@@ -72,9 +73,11 @@ namespace PasswordBank.DataModel
             };
             var database = new Database(new SqliteConnection(builder.ConnectionString));
 
-            using PooledArray<byte> verificationSalt = new(PBKDF2.SaltSize);
-            using PooledArray<byte> encryptionSalt = new(PBKDF2.SaltSize);
-            using PooledArray<byte> masterPasswordHash = new(PBKDF2.OutputSize);
+            // NOTE: no point in using PooledArray<byte> here, because SqliteParameterCollection.AddWithValue()
+            //  has no overload taking a Span<T> and we have to call ToArray() which allocates a byte[] anyways.
+            byte[] verificationSalt = new byte[PBKDF2.SaltSize];
+            byte[] encryptionSalt = new byte[PBKDF2.SaltSize];
+            byte[] masterPasswordHash = new byte[PBKDF2.OutputSize];
             try
             {
                 database.connection.Open();
@@ -110,9 +113,9 @@ namespace PasswordBank.DataModel
                 command.ExecuteNonQuery();
 
                 // Generate the master salts and the master password hash
-                Cryptography.Random.Fill(verificationSalt.GetData_W());
-                Cryptography.Random.Fill(encryptionSalt.GetData_W());
-                PBKDF2.GenerateKey(password.GetData(), verificationSalt.GetData(), masterPasswordHash.GetData_W());
+                Cryptography.Random.Fill(verificationSalt);
+                Cryptography.Random.Fill(encryptionSalt);
+                PBKDF2.GenerateKey(password.GetData(), verificationSalt, masterPasswordHash);
 
                 // Database schema version number
                 byte[] databaseVersion = BitConverter.GetBytes(1);
@@ -134,7 +137,7 @@ namespace PasswordBank.DataModel
                     INSERT INTO ServiceData
                     VALUES('VerificationSalt', $value);
                     """;
-                command.Parameters.AddWithValue("$value", verificationSalt.GetData().ToArray());
+                command.Parameters.AddWithValue("$value", verificationSalt);
                 added += command.ExecuteNonQuery();
 
                 command.Parameters.Clear();
@@ -142,7 +145,7 @@ namespace PasswordBank.DataModel
                     INSERT INTO ServiceData
                     VALUES('EncryptionSalt', $value);
                     """;
-                command.Parameters.AddWithValue("$value", encryptionSalt.GetData().ToArray());
+                command.Parameters.AddWithValue("$value", encryptionSalt);
                 added += command.ExecuteNonQuery();
 
                 command.Parameters.Clear();
@@ -150,7 +153,7 @@ namespace PasswordBank.DataModel
                     INSERT INTO ServiceData
                     VALUES('MasterPasswordHash', $value);
                     """;
-                command.Parameters.AddWithValue("$value", masterPasswordHash.GetData().ToArray());
+                command.Parameters.AddWithValue("$value", masterPasswordHash);
                 added += command.ExecuteNonQuery();
 
                 if (added != 4)
@@ -172,6 +175,12 @@ namespace PasswordBank.DataModel
                     File.Delete(DatabaseFilePath);
                 }
                 throw;
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(verificationSalt);
+                CryptographicOperations.ZeroMemory(encryptionSalt);
+                CryptographicOperations.ZeroMemory(masterPasswordHash);
             }
         }
 
