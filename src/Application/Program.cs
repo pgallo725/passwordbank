@@ -8,6 +8,11 @@ namespace PasswordBank;
 internal partial class Program
 {
     /// <summary>
+    /// The PasswordBank application version number in the <i>Major.Minor.Patch</i> format.
+    /// </summary>
+    private static readonly Version VersionNumber = new(1, 0, 0);
+
+    /// <summary>
     /// A 'null' EncryptedCredential object to use as cancellation result.
     /// </summary>
     private static readonly EncryptedCredential NullCredential = new()
@@ -24,7 +29,7 @@ internal partial class Program
     static void Main(string[] args)
     {
         // Application title
-        Console.Title = "PasswordBank v1.0.0";
+        Console.Title = $"PasswordBank v{VersionNumber}";
         AnsiConsole.Write(new Panel($"""
             [{ColorPalette.PRIMARY}]
                 _____                                           _  ____                 _    
@@ -34,7 +39,7 @@ internal partial class Program
                | |   | (_| |\__ \\__ \ \ V  V /| (_) || |  | (_| || |_) || (_| || | | ||   < 
                |_|    \__,_||___/|___/  \_/\_/  \___/ |_|   \__,_||____/  \__,_||_| |_||_|\_\[/]
             [{ColorPalette.SECONDARY}]
-            Version 1.0.0                                                    developed by JackaL[/]
+            Version {VersionNumber}                                                    developed by JackaL[/]
 
             """)
             .RoundedBorder()
