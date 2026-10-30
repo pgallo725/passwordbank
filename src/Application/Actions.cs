@@ -148,7 +148,8 @@ internal partial class Program
     /// Performs the following steps:<br/>
     ///     1. Authenticates the user and connects to the database<br/>
     ///     2. Prompts the user for the new master password (twice for confirmation)<br/>
-    ///     3. Executes the ChangePassword() routine on the database, reporting errors or success
+    ///     3. Executes the ChangePassword() routine on the database, reporting errors or success<br/>
+    ///     3b. While ChangePassword() executes, plays a spinner animation in the console
     /// </summary>
     internal static void ChangeMasterPassword()
     {
@@ -175,8 +176,15 @@ internal partial class Program
 
         if (newPassword.ContentEquals(confirmPassword))
         {
-            // Update the master password in the database (re-encrypt all data)
-            bool updateSuccessful = database.ChangePassword(currentPassword, newPassword);
+            bool updateSuccessful = false;
+            AnsiConsole.Status()
+                .Spinner(Spinner.Known.Ascii)
+                .SpinnerStyle(new Style(ColorPalette.NEUTRAL_LIGHT))
+                .Start($"[{ColorPalette.NEUTRAL_LIGHT}]Re-encrypting database with new master password...[/]", ctx =>
+                {
+                    // Update the master password in the database (re-encrypt all data)
+                    updateSuccessful = database.ChangePassword(currentPassword, newPassword);
+                });
 
             if (updateSuccessful)
                 AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Successfully updated master password![/]");
