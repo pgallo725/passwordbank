@@ -73,8 +73,8 @@ namespace PasswordBank.DataModel
             };
             var database = new Database(new SqliteConnection(builder.ConnectionString));
 
-            // NOTE: no point in using PooledArray<byte> here, because SqliteParameterCollection.AddWithValue()
-            //  has no overload taking a Span<T> and we have to call ToArray() which allocates a byte[] anyways.
+            // NOTE: no point in using stackalloc or PooledArray<byte>, because SqliteParameterCollection.AddWithValue()
+            //  has no overload taking a Span<T> and we have to call ToArray() which allocates a new byte[] anyways.
             byte[] verificationSalt = new byte[PBKDF2.SaltSize];
             byte[] encryptionSalt = new byte[PBKDF2.SaltSize];
             byte[] masterPasswordHash = new byte[PBKDF2.OutputSize];
@@ -623,25 +623,25 @@ namespace PasswordBank.DataModel
 
             KeyGenerator keygen = GetKeyGenerator();
             byte[] verificationSalt = GetVerificationSalt();
+            byte[] newPasswordHash = new byte[PBKDF2.OutputSize];
 
-            using PooledArray<byte> newPasswordHash = new(PBKDF2.OutputSize);
-            using PooledArray<byte> oldEncryptionKey = new(AES256.KeySize);
-            using PooledArray<byte> newEncryptionKey = new(AES256.KeySize);
+            Span<byte> oldEncryptionKey = stackalloc byte[AES256.KeySize];
+            Span<byte> newEncryptionKey = stackalloc byte[AES256.KeySize];
             try
             {
                 // Generate the hash for verifying the new master password
-                PBKDF2.GenerateKey(newPassword.GetData(), verificationSalt, newPasswordHash.GetData_W());
+                PBKDF2.GenerateKey(newPassword.GetData(), verificationSalt, newPasswordHash);
 
                 // Generate the keys only once before the loop over all database records
-                keygen.GetKey(oldPassword.GetData(), oldEncryptionKey.GetData_W());
-                keygen.GetKey(newPassword.GetData(), newEncryptionKey.GetData_W());
+                keygen.GetKey(oldPassword.GetData(), oldEncryptionKey);
+                keygen.GetKey(newPassword.GetData(), newEncryptionKey);
 
                 // Loop over all credentials in the database and re-encrypt them with the new key
                 int updated = 0;
                 foreach (EncryptedCredential oldEncryptedCredential in credentials)
                 {
-                    using PlaintextCredential plaintextCredential = oldEncryptedCredential.Decrypt(oldEncryptionKey.GetData());
-                    EncryptedCredential newEncryptedCredential = plaintextCredential.Encrypt(newEncryptionKey.GetData());
+                    using PlaintextCredential plaintextCredential = oldEncryptedCredential.Decrypt(oldEncryptionKey);
+                    EncryptedCredential newEncryptedCredential = plaintextCredential.Encrypt(newEncryptionKey);
                     plaintextCredential.Password.Zeroise(); // remove plaintext secrets from memory immediately
 
                     command.Parameters[0].Value = newEncryptedCredential.EncryptionNonce;
@@ -658,7 +658,7 @@ namespace PasswordBank.DataModel
                     SET Value = $hash
                     WHERE Name = 'MasterPasswordHash';
                     """;
-                command.Parameters.AddWithValue("$hash", newPasswordHash.GetData().ToArray());
+                command.Parameters.AddWithValue("$hash", newPasswordHash);
                 updated += command.ExecuteNonQuery();
 
                 if (updated != credentials.Count + 1 /* for the password hash */)
@@ -687,6 +687,12 @@ namespace PasswordBank.DataModel
             {
                 transaction.Rollback();
                 return false;
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(newPasswordHash);
+                CryptographicOperations.ZeroMemory(oldEncryptionKey);
+                CryptographicOperations.ZeroMemory(newEncryptionKey);
             }
         }
     }

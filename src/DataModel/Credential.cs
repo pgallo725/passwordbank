@@ -1,5 +1,6 @@
 ﻿using PasswordBank.Cryptography;
 using PasswordBank.Foundation;
+using System.Security.Cryptography;
 
 namespace PasswordBank.DataModel
 {
@@ -28,23 +29,30 @@ namespace PasswordBank.DataModel
 
         public EncryptedCredential Encrypt(KeyGenerator keygen, SecretString password)
         {
-            using PooledArray<byte> key = new(AES256.KeySize);
-
-            // Generate encryption key from the master password
-            keygen.GetKey(password.GetData(), key.GetData_W());
-
-            byte[] nonce = Cryptography.Random.GenerateBytes(AES256.NonceSize);
-            (byte[] ciphertext, byte[] tag) = AES256.Encrypt(Password.GetData(), key.GetData(), nonce);
-
-            return new EncryptedCredential()
+            Span<byte> key = stackalloc byte[AES256.KeySize];
+            try
             {
-                Name = Name,
-                EmailAddress = EmailAddress,
-                Username = Username,
-                EncryptionNonce = nonce,
-                EncryptedPassword = ciphertext,
-                EncryptionTag = tag
-            };
+                // Generate encryption key from the master password
+                keygen.GetKey(password.GetData(), key);
+
+                byte[] nonce = Cryptography.Random.GenerateBytes(AES256.NonceSize);
+                (byte[] ciphertext, byte[] tag) = AES256.Encrypt(Password.GetData(), key, nonce);
+
+                return new EncryptedCredential()
+                {
+                    Name = Name,
+                    EmailAddress = EmailAddress,
+                    Username = Username,
+                    EncryptionNonce = nonce,
+                    EncryptedPassword = ciphertext,
+                    EncryptionTag = tag
+                };
+            }
+            finally
+            {
+                // Clear memory to avoid leaking the encryption key
+                CryptographicOperations.ZeroMemory(key);
+            }
         }
 
         public void Dispose()
@@ -77,18 +85,25 @@ namespace PasswordBank.DataModel
 
         public PlaintextCredential Decrypt(KeyGenerator keygen, SecretString password)
         {
-            using PooledArray<byte> key = new(AES256.KeySize);
-
-            // Generate decryption key from the master password
-            keygen.GetKey(password.GetData(), key.GetData_W());
-
-            return new PlaintextCredential()
+            Span<byte> key = stackalloc byte[AES256.KeySize];
+            try
             {
-                Name = Name,
-                EmailAddress = EmailAddress,
-                Username = Username,
-                Password = new(AES256.Decrypt(EncryptedPassword, key.GetData(), EncryptionNonce, EncryptionTag)),
-            };
+                // Generate decryption key from the master password
+                keygen.GetKey(password.GetData(), key);
+
+                return new PlaintextCredential()
+                {
+                    Name = Name,
+                    EmailAddress = EmailAddress,
+                    Username = Username,
+                    Password = new(AES256.Decrypt(EncryptedPassword, key, EncryptionNonce, EncryptionTag)),
+                };
+            }
+            finally
+            {
+                // Clear memory to avoid leaking the encryption key
+                CryptographicOperations.ZeroMemory(key);
+            }
         }
     }
 }

@@ -1,6 +1,8 @@
 ﻿using PasswordBank.Foundation;
-using System.Text;
 using Spectre.Console;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace PasswordBank.UI
 {
@@ -9,60 +11,68 @@ namespace PasswordBank.UI
         public static SecretString SecretTextInput(SecretString? initialString = null)
         {
             const int MAX_SECRET_LENGTH = 256;
-            using PooledArray<char> input = new(MAX_SECRET_LENGTH);
+            Span<char> input = stackalloc char[MAX_SECRET_LENGTH];
             int length = 0;
 
-            // If an initial value is provided, copy it into the working buffer
-            if (!SecretString.IsNullOrEmpty(initialString))
+            try
             {
-                initialString.GetData().CopyTo(input.GetData_W());
-                for (length = 0; length < initialString.GetLength(); length++)
-                    Console.Write('*');
-            }
-            
-            while (true)
-            {
-                ConsoleKeyInfo keypress = Console.ReadKey(true);
-                char keyChar = keypress.KeyChar;
-
-                // Skip unsupported modifiers
-                if ((keypress.Modifiers & (ConsoleModifiers.Alt | ConsoleModifiers.Control)) != 0)
-                    continue;
-
-                // Handle Enter keypress
-                if (keypress.Key == ConsoleKey.Enter)
-                    break;
-
-                // Handle Backspace keypress
-                if (keypress.Key == ConsoleKey.Backspace)
+                // If an initial value is provided, copy it into the working buffer
+                if (!SecretString.IsNullOrEmpty(initialString))
                 {
-                    if (length > 0)
+                    initialString.GetData().CopyTo(input);
+                    for (length = 0; length < initialString.GetLength(); length++)
+                        Console.Write('*');
+                }
+                
+                while (true)
+                {
+                    ConsoleKeyInfo keypress = Console.ReadKey(true);
+                    char keyChar = keypress.KeyChar;
+
+                    // Skip unsupported modifiers
+                    if ((keypress.Modifiers & (ConsoleModifiers.Alt | ConsoleModifiers.Control)) != 0)
+                        continue;
+
+                    // Handle Enter keypress
+                    if (keypress.Key == ConsoleKey.Enter)
+                        break;
+
+                    // Handle Backspace keypress
+                    if (keypress.Key == ConsoleKey.Backspace)
                     {
-                        Console.CursorLeft -= 1;
-                        Console.Write(' ');
-                        Console.CursorLeft -= 1;
-                        length--;
+                        if (length > 0)
+                        {
+                            Console.CursorLeft -= 1;
+                            Console.Write(' ');
+                            Console.CursorLeft -= 1;
+                            length--;
+                        }
+                        continue;
                     }
-                    continue;
+
+                    // Skip non-ASCII or invalid characters
+                    if (keyChar == '\u0000' || !char.IsAscii(keyChar))
+                        continue;
+
+                    // Add regular ASCII characters to the string and echo a '*'
+                    if (length < MAX_SECRET_LENGTH)
+                    {
+                        input[length++] = keyChar;
+                        Console.Write('*');
+                    }
                 }
 
-                // Skip non-ASCII or invalid characters
-                if (keyChar == '\u0000' || !char.IsAscii(keyChar))
-                    continue;
+                char[] data = GC.AllocateUninitializedArray<char>(length);
+                input[0..length].CopyTo(data);
 
-                // Add regular ASCII characters to the string and echo a '*'
-                if (length < MAX_SECRET_LENGTH)
-                {
-                    input.Buffer[length++] = keyChar;
-                    Console.Write('*');
-                }
+                return new SecretString(data);
             }
-
-            char[] data = GC.AllocateUninitializedArray<char>(length);
-            input.Buffer.AsSpan(0, length).CopyTo(data);
-            input.Clear();
-
-            return new SecretString(data);
+            finally
+            {
+                // Zeroise local buffer to remove sensitive data from memory
+                Span<byte> bytes = MemoryMarshal.AsBytes(input);
+                CryptographicOperations.ZeroMemory(bytes);
+            }
         }
 
 
