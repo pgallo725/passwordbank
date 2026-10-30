@@ -24,11 +24,11 @@ internal partial class Program
     {
         return action switch
         {
-            MainMenuAction.View           => $"[{ColorPalette.PRIMARY}]View[/] the list of all stored credentials",
-            MainMenuAction.Search         => $"[{ColorPalette.PRIMARY}]Search[/] for an account in your stored credentials",
-            MainMenuAction.Add            => $"[{ColorPalette.PRIMARY}]Add[/] new account credentials to the database",
-            MainMenuAction.ChangePassword => $"[{ColorPalette.PRIMARY}]Change[/] your master password",
-            MainMenuAction.Quit           => $"[{ColorPalette.PRIMARY}]Exit[/] PasswordBank",
+            MainMenuAction.View           => $"[{ColorPalette.PRIMARY}]View[/] the list of all your credentials",
+            MainMenuAction.Search         => $"[{ColorPalette.PRIMARY}]Search[/] for specific records in the database",
+            MainMenuAction.Add            => $"[{ColorPalette.PRIMARY}]Add[/] new credentials to the database",
+            MainMenuAction.ChangePassword => $"[{ColorPalette.PRIMARY}]Change[/] your master password [{ColorPalette.NEUTRAL}](recommended periodically)[/]",
+            MainMenuAction.Quit           => $"[{ColorPalette.PRIMARY}]Quit[/] the application",
             _ => throw new ArgumentOutOfRangeException(nameof(action)),
         };
     }
@@ -47,10 +47,10 @@ internal partial class Program
     {
         return action switch
         {
-            CredentialAction.View   => $"[{ColorPalette.PRIMARY}]View[/] the account credentials",
-            CredentialAction.Edit   => $"[{ColorPalette.PRIMARY}]Edit[/] the account credentials",
-            CredentialAction.Delete => $"[{ColorPalette.PRIMARY}]Delete[/] the account credentials from the database",
-            CredentialAction.Cancel => $"[{ColorPalette.PRIMARY}]Back[/] to the list of credentials",
+            CredentialAction.View   => $"[{ColorPalette.PRIMARY}]View[/] credential details",
+            CredentialAction.Edit   => $"[{ColorPalette.PRIMARY}]Edit[/] the credential information",
+            CredentialAction.Delete => $"[{ColorPalette.PRIMARY}]Delete[/] this record from the database",
+            CredentialAction.Cancel => $"[{ColorPalette.PRIMARY}]Back[/] to the previous menu",
             _ => throw new ArgumentOutOfRangeException(nameof(action)),
         };
     }
@@ -68,20 +68,26 @@ internal partial class Program
     /// <returns>A boolean value indicating whether the action was successful or not.</returns>
     internal static bool CreateDatabase()
     {
-        AnsiConsole.MarkupLine($"Welcome to [{ColorPalette.PRIMARY}]PasswordBank[/]!");
-        AnsiConsole.MarkupLine($"No [italic]credentials.db[/] file detected, [slowblink]initializing new database...[/]\n");
+        // Introduction
+        AnsiConsole.MarkupLine($"""
+            Welcome to [{ColorPalette.PRIMARY}]PasswordBank[/]!
+
+            Your credentials will be stored in a strongly encrypted database,
+            accessible exclusively via your secret [{ColorPalette.SECONDARY}]master password[/].
+
+            """);
 
         // Repeat the following block until the user provides matching passwords
         ConsoleHelper.SaveCheckpoint();
         while (true)
         {
             using SecretString masterPassword = ValidatedSecretPrompt(
-                $"Choose your [{ColorPalette.SECONDARY}]master password[/]: ",
+                $"Choose your [{ColorPalette.SECONDARY}]master password[/]:",
                 new MasterPasswordValidator()
                 );
 
             using SecretString confirmPassword = ValidatedSecretPrompt(
-                $"Confirm your [{ColorPalette.SECONDARY}]master password[/]: ",
+                $"Confirm your [{ColorPalette.SECONDARY}]master password[/]:",
                 new BasicValidator()
                 );
 
@@ -94,13 +100,13 @@ internal partial class Program
                     //  an open connection while we're on the application main menu (unauthenticated)
                     Database.Create(masterPassword).Dispose();
 
-                    AnsiConsole.Write('\n');
+                    AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[{ColorPalette.SUCCESS}]Successfully created credentials database![/]");
                     result = true;
                 }
                 catch (Exception e)
                 {
-                    AnsiConsole.Write('\n');
+                    AnsiConsole.WriteLine();
                     AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]Failed to create credentials database![/]");
                     result = false;
 
@@ -127,7 +133,7 @@ internal partial class Program
                 masterPassword.Zeroise();
                 confirmPassword.Zeroise();
 
-                AnsiConsole.Write('\n');
+                AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]The provided passwords do not match, please retry.[/]");
 
                 ContinuationPrompt();
@@ -138,7 +144,7 @@ internal partial class Program
 
 
     /// <summary>
-    /// [ACTION] Implements the procedure for changing the master password of the credentials database.<br/>
+    /// [ACTION] Implements the procedure for changing the master password of the database.<br/>
     /// Performs the following steps:<br/>
     ///     1. Authenticates the user and connects to the database<br/>
     ///     2. Prompts the user for the new master password (twice for confirmation)<br/>
@@ -147,9 +153,10 @@ internal partial class Program
     internal static void ChangeMasterPassword()
     {
         // Action title
-        AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]CHANGE MASTER PASSWORD[/]");
+        AnsiConsole.MarkupLine($"""
+            [{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]CHANGE MASTER PASSWORD[/]
+            """);
 
-        // Authenticate the user and open the database
         using Database? database = AuthenticationPrompt(out SecretString inputPassword);
         using SecretString currentPassword = inputPassword;
 
@@ -157,12 +164,12 @@ internal partial class Program
             return;
 
         using SecretString newPassword = ValidatedSecretPrompt(
-            $"Choose your new [{ColorPalette.SECONDARY}]master password[/]: ",
+            $"Choose your new [{ColorPalette.SECONDARY}]master password[/]:",
             new MasterPasswordValidator()
             );
 
         using SecretString confirmPassword = ValidatedSecretPrompt(
-            $"Confirm your new [{ColorPalette.SECONDARY}]master password[/]: ",
+            $"Confirm your new [{ColorPalette.SECONDARY}]master password[/]:",
             new BasicValidator()
             );
 
@@ -171,15 +178,14 @@ internal partial class Program
             // Update the master password in the database (re-encrypt all data)
             bool updateSuccessful = database.ChangePassword(currentPassword, newPassword);
 
-            AnsiConsole.Write('\n');
             if (updateSuccessful)
-                AnsiConsole.MarkupLine($"[{ColorPalette.SUCCESS}]Successfully updated master password![/]");
-            else AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]Failed to update the master password![/]");
+                AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Successfully updated master password![/]");
+            else AnsiConsole.MarkupLine($"\n[{ColorPalette.ERROR}]Failed to update the master password![/]");
         }
         else
         {
-            AnsiConsole.Write('\n');
-            AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]The provided passwords do not match.[/] ");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]The provided passwords do not match, aborting.[/] ");
         }
     }
 
@@ -194,9 +200,10 @@ internal partial class Program
     internal static List<EncryptedCredential>? ListCredentials()
     {
         // Action title
-        AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]VIEW CREDENTIALS[/]");
+        AnsiConsole.MarkupLine($"""
+            [{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]LIST CREDENTIAL RECORDS[/]
+            """);
 
-        // Authenticate the user and open the database
         using Database? database = AuthenticationPrompt(out SecretString inputPassword);
         inputPassword.Zeroise();  // not used by this method
 
@@ -209,7 +216,7 @@ internal partial class Program
 
 
     /// <summary>
-    /// [ACTION] Implements the procedure for searching the credentials database for entries matching with user input.<br/>
+    /// [ACTION] Implements the procedure for searching credentials in the database matching with user input.<br/>
     /// Performs the following steps:<br/>
     ///     1. Authenticates the user and connects to the database<br/>
     ///     2. Prompts the user to input the search string<br/>
@@ -220,14 +227,21 @@ internal partial class Program
     internal static List<EncryptedCredential>? SearchCredentials()
     {
         // Action title
-        AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]SEARCH CREDENTIALS[/]");
+        AnsiConsole.MarkupLine($"""
+            [{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]SEARCH CREDENTIAL RECORDS[/]
+            """);
 
-        // Authenticate the user and open the database
         using Database? database = AuthenticationPrompt(out SecretString inputPassword);
         inputPassword.Zeroise();  // not used by this method
 
         if (database is null)
             return null;
+
+        AnsiConsole.MarkupLine($"""
+            [{ColorPalette.NEUTRAL_LIGHT}]Find credential records in the database whose identifier or email
+            address fields match (even partially) with the provided search string.[/]
+
+            """);
 
         // Get the search string from user input
         string searchString = ValidatedTextPrompt(
@@ -253,9 +267,10 @@ internal partial class Program
     internal static void ViewCredential(EncryptedCredential credential)
     {
         // Action title
-        AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]VIEW CREDENTIAL INFORMATION[/]");
+        AnsiConsole.MarkupLine($"""
+            [{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]VIEW CREDENTIAL RECORD[/]
+            """);
 
-        // Authenticate the user and open the database
         using Database? database = AuthenticationPrompt(out SecretString inputPassword);
         using SecretString masterPassword = inputPassword;
 
@@ -272,15 +287,15 @@ internal partial class Program
         table.Border(TableBorder.Heavy);
         table.AddColumn("Key", c => c.Alignment(Justify.Right));
         table.AddColumn("Value", c => c.Alignment(Justify.Center));
-        table.AddRow($"[{ColorPalette.SECONDARY}]Website/Service[/]", Markup.Escape(plaintextCredential.Name));
+        table.AddRow($"[{ColorPalette.SECONDARY}]Identifier[/]", Markup.Escape(plaintextCredential.Name));
         table.AddRow($"[{ColorPalette.SECONDARY}]Email Address[/]", Markup.Escape(plaintextCredential.EmailAddress ?? string.Empty));
         table.AddRow($"[{ColorPalette.SECONDARY}]Username[/]", Markup.Escape(plaintextCredential.Username ?? string.Empty));
-        table.AddRow($"[{ColorPalette.SECONDARY}]Password[/]", Markup.Escape(plaintextCredential.Password.ToString())); // TODO: can we avoid the string conversion?
+        table.AddRow($"[{ColorPalette.SECONDARY}]Password[/]", Markup.Escape(plaintextCredential.Password.ToString())); // TODO: avoid the string conversion (?)
         table.HideHeaders();
         table.ShowRowSeparators();
 
         AnsiConsole.Write(table);
-        AnsiConsole.Write('\n');
+        AnsiConsole.WriteLine();
     }
 
 
@@ -296,33 +311,34 @@ internal partial class Program
     internal static void AddCredential()
     {
         // Action title
-        AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]ADD ACCOUNT[/]");
+        AnsiConsole.MarkupLine($"""
+            [{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]ADD CREDENTIAL RECORD[/]
+            """);
 
-        // Authenticate the user and open the database
         using Database? database = AuthenticationPrompt(out SecretString inputPassword);
         using SecretString masterPassword = inputPassword;
 
         if (database is null)
             return;
 
-        AnsiConsole.WriteLine("Please insert the required account information:");
-        AnsiConsole.Write('\n');
+        AnsiConsole.WriteLine("Please insert the requested credential information:");
+        AnsiConsole.WriteLine();
 
         using PlaintextCredential plaintextCredential = new()
         {
-            Name = ValidatedTextPrompt(
-                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Website/Service:[/]")
+            Name = ValidatedTextPrompt(new TextPrompt<string>(
+                $"[{ColorPalette.SECONDARY}] - Identifier:[/]")
                     .ClearOnFinish(false),
                 new AccountNameValidator(database)
             ),
-            EmailAddress = ValidatedTextPrompt(
-                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Email Address:[/]")
+            EmailAddress = ValidatedTextPrompt(new TextPrompt<string>(
+                $"[{ColorPalette.SECONDARY}] - Email Address:[/] [{ColorPalette.NEUTRAL}](optional)[/]")
                     .AllowEmpty()
                     .ClearOnFinish(false),
                 new EmailAddressValidator()
             ),
-            Username = ValidatedTextPrompt(
-                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Username:[/]")
+            Username = ValidatedTextPrompt(new TextPrompt<string>(
+                $"[{ColorPalette.SECONDARY}] - Username:[/] [{ColorPalette.NEUTRAL}](optional)[/]")
                     .AllowEmpty()
                     .ClearOnFinish(false),
                 new BasicValidator()
@@ -342,8 +358,8 @@ internal partial class Program
         plaintextCredential.Password.Zeroise();
 
         if (database.Insert(encryptedCredential))
-            AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Credentials Successfully added to the database![/]");
-        else AnsiConsole.MarkupLine($"\n[{ColorPalette.ERROR}]Failed to add the credentials to the database[/]");
+            AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Successfully added credential record to the database![/]");
+        else AnsiConsole.MarkupLine($"\n[{ColorPalette.ERROR}]Failed to add the credential record to the database![/]");
     }
 
 
@@ -362,24 +378,25 @@ internal partial class Program
     internal static void EditCredential(EncryptedCredential credential)
     {
         // Action title
-        AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]EDIT CREDENTIAL[/]");
+        AnsiConsole.MarkupLine($"""
+            [{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]EDIT CREDENTIAL RECORD[/]
+            """);
 
-        // Authenticate the user and open the database
         using Database? database = AuthenticationPrompt(out SecretString inputPassword);
         using SecretString masterPassword = inputPassword;
 
         if (database is null)
             return;
 
-        AnsiConsole.WriteLine("Update the credentials information:");
-        AnsiConsole.Write('\n');
+        AnsiConsole.WriteLine("Please provide the updated credential information:");
+        AnsiConsole.WriteLine();
 
         // Decrypt the previous credential information to use as default values
         KeyGenerator keygen = database.GetKeyGenerator();
         using PlaintextCredential plaintextCredential = credential.Decrypt(keygen, masterPassword);
 
         plaintextCredential.Name = ValidatedTextPrompt(
-            new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Website/Service:[/]")
+            new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Identifier:[/]")
                 .DefaultValue(plaintextCredential.Name)
                 .EditableDefaultValue(true)
                 .HideDefaultValue()
@@ -413,25 +430,16 @@ internal partial class Program
             );
 
         // Encrypt the account information before writing it to the database
-        EncryptedCredential newEncryptedCredential = plaintextCredential.Encrypt(keygen, masterPassword);
+        EncryptedCredential updatedCredential = plaintextCredential.Encrypt(keygen, masterPassword);
 
         // Remove secrets from memory immediately
         masterPassword.Zeroise();
         plaintextCredential.Password.Zeroise();
 
-        if (database.Update(credential, newEncryptedCredential))
-        {
-            AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Credentials Successfully updated in the database![/]");
-
-            // Update to the new credential information in-memory
-            credential.Name = newEncryptedCredential.Name;
-            credential.EmailAddress = newEncryptedCredential.EmailAddress;
-            credential.Username = newEncryptedCredential.Username;
-            credential.EncryptionNonce = newEncryptedCredential.EncryptionNonce;
-            credential.EncryptedPassword = newEncryptedCredential.EncryptedPassword;
-            credential.EncryptionTag = newEncryptedCredential.EncryptionTag;
-        }
-        else AnsiConsole.MarkupLine($"\n[{ColorPalette.ERROR}]Failed to update the credentials in the database[/]");
+        // Update the database and the in-memory record as well
+        if (database.Update(credential, updatedCredential) && credential.Set(updatedCredential))
+            AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Successfully updated credential record![/]");
+        else AnsiConsole.MarkupLine($"\n[{ColorPalette.ERROR}]Failed to update the credential record![/]");
     }
 
 
@@ -446,23 +454,25 @@ internal partial class Program
     internal static void DeleteCredential(EncryptedCredential credential, List<EncryptedCredential>? credentials)
     {
         // Action title
-        AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]DELETE CREDENTIAL[/]");
+        AnsiConsole.MarkupLine($"""
+            [{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]DELETE CREDENTIAL RECORD[/]
+            """);
 
-        // Authenticate the user and open the database
+        if (credentials != null && !credentials.Contains(credential))
+            throw new ArgumentException(
+                "The provided credentials list must contain the credential record to delete.",
+                nameof(credentials));
+
         using Database? database = AuthenticationPrompt(out SecretString inputPassword);
         inputPassword.Zeroise();  // not used by this method
 
         if (database is null)
             return;
 
-        if (database.Remove(credential))
-        {
-            AnsiConsole.MarkupLine($"[{ColorPalette.SUCCESS}]Credentials Successfully removed from the database![/]");
-
-            // Remove the deleted credential from the in-memory list
-            credentials?.Remove(credential);
-        }
-        else AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]Failed to remove the credentials from the database[/]");
+        // Remove the credential both the database and from the in-memory list
+        if (database.Remove(credential) && (credentials?.Remove(credential) ?? true))
+            AnsiConsole.MarkupLine($"[{ColorPalette.SUCCESS}]Successfully removed credential record from the database![/]");
+        else AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]Failed to remove the credential record from the database[/]");
     }
 }
 

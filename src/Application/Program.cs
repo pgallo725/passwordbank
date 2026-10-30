@@ -17,7 +17,7 @@ internal partial class Program
     /// </summary>
     private static readonly EncryptedCredential NullCredential = new()
     {
-        Name = string.Empty,
+        Name = "[BACK TO MAIN MENU]",
         EmailAddress = null,
         Username = null,
         EncryptionNonce = [],
@@ -28,6 +28,8 @@ internal partial class Program
 
     static void Main(string[] args)
     {
+        ConsoleHelper.SaveCheckpoint();
+
         // Application title
         Console.Title = $"PasswordBank v{VersionNumber}";
         AnsiConsole.Write(new Panel($"""
@@ -56,6 +58,12 @@ internal partial class Program
             ConsoleHelper.SaveCheckpoint();
             try
             {
+                AnsiConsole.MarkupLine($"""
+                    [{ColorPalette.NEUTRAL_LIGHT}]File [italic]'credentials.db'[/] not detected in the application folder.[/]
+                    [{ColorPalette.NEUTRAL}]Executing one-time database creation procedure...[/]
+
+                    """);
+
                 if (!CreateDatabase())
                     return;
             }
@@ -76,7 +84,7 @@ internal partial class Program
                 // Show the main menu
                 MainMenuAction mainAction = AnsiConsole.Prompt(
                     new SelectionPrompt<MainMenuAction>()
-                        .Title($"Select one of the available [{ColorPalette.PRIMARY}]operations[/]: ")
+                        .Title($"Select one of the available [{ColorPalette.PRIMARY}]operations[/]:")
                         .UseConverter(MainMenuActionTextConverter)
                         .AddChoices(MainMenuAction.View,
                                     MainMenuAction.Search,
@@ -109,22 +117,26 @@ internal partial class Program
                         }
                         ConsoleHelper.RestoreCheckpoint();
 
-                        if (credentials.Count == 0)
+                        while (true)
                         {
-                            AnsiConsole.WriteLine("No credentials found in the database.\n");
-                            ContinuationPrompt();
-                        }
-                        else while (true)
-                        {
+                            // Display the number of credential records in the list
+                            AnsiConsole.MarkupLine(mainAction switch
+                            {
+                                MainMenuAction.View => $"[{ColorPalette.NEUTRAL}]Showing [bold]{credentials.Count}[/] database records.[/]",
+                                MainMenuAction.Search => $"[{ColorPalette.NEUTRAL}]Search found [bold]{credentials.Count}[/] relevant result(s).[/]",
+                                _ => throw new UnreachableException()
+                            });
+
                             // Display the list of credentials and let the user select one
                             EncryptedCredential credential = AnsiConsole.Prompt(
                                 new SelectionPrompt<EncryptedCredential>()
-                                    .Title("Select a credential record to access further options:")
+                                    .Title($"Select a [{ColorPalette.PRIMARY}]credential record[/] to access further options:")
                                     .UseConverter(c => Markup.Escape(c.Name))
                                     .AddChoices(credentials)
+                                    .AddChoices(NullCredential)
                                     .AddCancelResult(NullCredential)
                                     .PageSize(10)
-                                    .MoreChoicesText($"[{ColorPalette.NEUTRAL}](Use arrow keys to see more credentials)[/]")
+                                    .MoreChoicesText($"[{ColorPalette.NEUTRAL}](Use the UP/DOWN arrow keys to navigate all records)[/]")
                                     .WrapAround(true)
                                     .HighlightStyle(Styles.HIGHLIGHT)
                             );
@@ -135,9 +147,10 @@ internal partial class Program
                                 break;
 
                             // Show the menu to choose the action for the selected credential
+                            string selected = Markup.Escape(credential.Name);
                             CredentialAction credentialAction = AnsiConsole.Prompt(
                                 new SelectionPrompt<CredentialAction>()
-                                    .Title($"Select one of the available [{ColorPalette.PRIMARY}]operations[/] for the selected credential: ")
+                                    .Title($"Select one of the available [{ColorPalette.PRIMARY}]operations[/] for [{ColorPalette.NEUTRAL}]{selected}[/]:")
                                     .UseConverter(CredentialActionTextConverter)
                                     .AddChoices(CredentialAction.View,
                                                 CredentialAction.Edit,
@@ -186,7 +199,9 @@ internal partial class Program
                         break;
 
                     case MainMenuAction.Quit:
-                        // Nothing to do, just exit from the application loop
+                        // Clear everything (including the application title) before quitting
+                        ConsoleHelper.DeleteCheckpoint();
+                        ConsoleHelper.RestoreCheckpoint();
                         return;
                 }
             }
@@ -194,7 +209,7 @@ internal partial class Program
             {
             #if DEBUG   // in Debug mode, print the whole exception trace
             #pragma warning disable IL3050  // WriteException() only used in Debug, no need for AOT compilation
-                AnsiConsole.Write('\n');
+                AnsiConsole.WriteLine();
                 AnsiConsole.WriteException(e, Styles.EXCEPTION);
             #pragma warning restore IL3050
             #elif RELEASE   // in Release mode, print only a short summary of the error

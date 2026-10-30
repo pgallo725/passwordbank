@@ -72,6 +72,18 @@ namespace PasswordBank.DataModel
         public required byte[]  EncryptedPassword { get; set; }
         public required byte[]  EncryptionTag     { get; set; }
 
+        public bool Set(EncryptedCredential other)
+        {
+            this.Name = other.Name;
+            this.EmailAddress = other.EmailAddress;
+            this.Username = other.Username;
+            this.EncryptionNonce = other.EncryptionNonce;
+            this.EncryptedPassword = other.EncryptedPassword;
+            this.EncryptionTag = other.EncryptionTag;
+
+            return true;
+        }
+
         public PlaintextCredential Decrypt(ReadOnlySpan<byte> key)
         {
             return new PlaintextCredential()

@@ -15,17 +15,13 @@ internal partial class Program
     /// <returns>An open connection to the credentials database in case of success, otherwise null.</returns>
     internal static Database? AuthenticationPrompt(out SecretString inputPassword)
     {
-        // Action title
         AnsiConsole.Markup($"[{ColorPalette.NEUTRAL}]>> AUTHENTICATION[/]");
-
-        ConsoleHelper.SaveCheckpoint();
-
-        AnsiConsole.Write('\n');
-        AnsiConsole.Write('\n');
+        ConsoleHelper.SaveCheckpoint(); // to change the status message later on
+        AnsiConsole.MarkupLine($" [{ColorPalette.NEUTRAL}]PENDING[/]\n");
 
         AnsiConsole.Markup($"Insert your [{ColorPalette.SECONDARY} slowblink]master password[/]: ");
         inputPassword = ConsoleHelper.SecretTextInput();
-        AnsiConsole.Write('\n');
+        AnsiConsole.WriteLine();
 
         Database? database;
         bool isCorrectPassword;

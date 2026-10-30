@@ -455,8 +455,8 @@ namespace PasswordBank.DataModel
 
 
         /// <summary>
-        /// Search among the database for credentials whose account name or email address matches<br/>
-        /// with the provided search string (partial matches supported on the account name field).
+        /// Search among the database for credentials whose identifier or email address matches<br/>
+        /// with the provided search string (partial matches supported on the identifier field).
         /// </summary>
         /// <param name="searchString">The string used for searching credential records.</param>
         /// <param name="maxResults">The maximum number of possible matches returned by this function.</param>
@@ -476,18 +476,18 @@ namespace PasswordBank.DataModel
             var entries = new List<EncryptedCredential>();
             while (entries.Count < maxResults && reader.Read())
             {
-                string accountName = reader.GetString(0);
-                string? emailAddress = reader.IsDBNull(1) ? null : reader.GetString(1);
+                string identifier = reader.GetString(0);
+                string emailAddress = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
 
                 // TODO: employ a Levenshtein distance based search for more accurate results
-                if (accountName.Contains(searchString, StringComparison.InvariantCultureIgnoreCase) ||
-                    (emailAddress?.Equals(searchString, StringComparison.OrdinalIgnoreCase) ?? false))
+                if (identifier.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
+                    emailAddress.Equals(searchString, StringComparison.OrdinalIgnoreCase))
                 {
                     // Create entry with the values read from the DB
                     EncryptedCredential credential = new()
                     {
-                        Name              = accountName,
-                        EmailAddress      = emailAddress,
+                        Name              = identifier,
+                        EmailAddress      = emailAddress == string.Empty ? null : emailAddress,
                         Username          = reader.IsDBNull(2) ? null : reader.GetString(2),
                         EncryptionNonce   = reader.GetFieldValue<byte[]>(3),
                         EncryptedPassword = reader.GetFieldValue<byte[]>(4),
@@ -501,13 +501,13 @@ namespace PasswordBank.DataModel
 
 
         /// <summary>
-        /// Query the database to check if it contains any credentials with the given account name.
+        /// Query the database to check if it contains any credentials with the given identifier.
         /// </summary>
-        /// <param name="accountName">The account name to look for.</param>
+        /// <param name="identifier">The credential name to look for.</param>
         /// <returns>A boolean value indicating whether the database contains an account with the given name.</returns>
-        public bool Contains(string accountName)
+        public bool Contains(string identifier)
         {
-            ArgumentException.ThrowIfNullOrEmpty(accountName);
+            ArgumentException.ThrowIfNullOrEmpty(identifier);
 
             using var command = connection.CreateCommand();
             command.CommandText = """
@@ -515,7 +515,7 @@ namespace PasswordBank.DataModel
                 FROM Credentials
                 WHERE AccountName = $accountName;
                 """;
-            command.Parameters.AddWithValue("$accountName", accountName);
+            command.Parameters.AddWithValue("$accountName", identifier);
             long count = (long)(command.ExecuteScalar() ?? 0);
             return (count > 0);
         }
