@@ -7,26 +7,27 @@ using System.Net.Mail;
 namespace PasswordBank.Application
 {
     /// <summary>
-    /// Generic interface of an object that implements text input validation.
+    /// Generic interface to implement input validation.
     /// </summary>
-    internal interface IValidator
+    internal interface IValidator<T>
     {
-        public ValidationResult Validate(string value);
-        public ValidationResult Validate(SecretString value);
+        /// <summary>
+        /// Validates an input value using a set of implementation-defined rules.
+        /// </summary>
+        /// <param name="value">The input value to validate.</param>
+        /// <returns>
+        /// A <see cref="ValidationResult"/> with the outcome of the validation checks.
+        /// </returns>
+        public static abstract ValidationResult Validate(T value);
     }
 
 
     /// <summary>
     /// Implements no validation, always returns success.
     /// </summary>
-    internal class NullValidator : IValidator
+    internal class NullValidator<T> : IValidator<T>
     {
-        public ValidationResult Validate(string value)
-        {
-            return ValidationResult.Success();
-        }
-
-        public ValidationResult Validate(SecretString value)
+        public static ValidationResult Validate(T value)
         {
             return ValidationResult.Success();
         }
@@ -36,16 +37,16 @@ namespace PasswordBank.Application
     /// <summary>
     /// Implements basic validation, only checking the input length against the maximum value.
     /// </summary>
-    internal class BasicValidator : IValidator
+    internal class BasicValidator : IValidator<string>, IValidator<SecretString>
     {
-        public ValidationResult Validate(string value)
+        public static ValidationResult Validate(string value)
         {
             if (value.Length > 256)
                 return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
             return ValidationResult.Success();
         }
 
-        public ValidationResult Validate(SecretString value)
+        public static ValidationResult Validate(SecretString value)
         {
             if (value.GetLength() > 256)
                 return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
@@ -55,11 +56,11 @@ namespace PasswordBank.Application
 
 
     /// <summary>
-    /// Implements validation of a string input that should represent an email address.
+    /// Implements input validation of a string that should represent an email address.
     /// </summary>
-    internal class EmailAddressValidator : IValidator
+    internal class EmailAddressValidator : IValidator<string>
     {
-        public ValidationResult Validate(string emailAddress)
+        public static ValidationResult Validate(string emailAddress)
         {
             // Consider an email address correct if it can be used to construct a valid MailAddress object
             if (emailAddress.Length > 256)
@@ -68,80 +69,62 @@ namespace PasswordBank.Application
                 return ValidationResult.Success();
             else return ValidationResult.Error("The input does not match the format of a valid email address.");
         }
-
-        public ValidationResult Validate(SecretString _)
-        {
-            // EmailAddressValidator should never be used with SecretString objects
-            throw new NotSupportedException();
-        }
     }
 
 
     /// <summary>
-    /// Implements validation of a string input that will be used as the name of an account.
+    /// Implements input validation of a string that will be used as a credential identifier.
     /// </summary>
-    /// <param name="database">A reference to the credentials database.</param>
-    internal class AccountNameValidator(Database? database) : IValidator
+    internal class IdentifierValidator : IValidator<string>
     {
-        public virtual ValidationResult Validate(string accountName)
+        public static Database? Database { private get; set; } = null;
+
+        public static ValidationResult Validate(string identifier)
         {
-            // Check that the account name is not empty and doesn't already exist in the database
-            if (string.IsNullOrWhiteSpace(accountName))
-                return ValidationResult.Error("The account name must contain atleast 1 non-whitespace character.");
-            else if (accountName.Length > 256)
+            // Database handle must be set before using this validator
+            ArgumentNullException.ThrowIfNull(Database, nameof(Database));
+
+            // Check that the identifier is not empty and doesn't already exist in the database
+            if (string.IsNullOrWhiteSpace(identifier))
+                return ValidationResult.Error("An identifier must contain atleast 1 non-whitespace character.");
+            else if (identifier.Length > 256)
                 return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
-            else if (database is null)
-                return ValidationResult.Error("Cannot access the database for checking the username.");
-            else if (database.Contains(accountName))
-                return ValidationResult.Error("An account with the same name already exists in the database.");
+            else if (Database is null)
+                return ValidationResult.Error("Cannot access the database for checking the identifier.");
+            else if (Database.Contains(identifier))
+                return ValidationResult.Error("A credential with the same identifier already exists in the database.");
             else return ValidationResult.Success();
         }
-
-        public virtual ValidationResult Validate(SecretString _)
-        {
-            // AccountNameValidator should never be used with SecretString objects
-            throw new NotSupportedException();
-        }
     }
 
 
     /// <summary>
-    /// Implements validation of an edited string that will be used as the name of an account.<br/>
-    /// This extends <see cref="AccountNameValidator"/> by allowing an unchanged account name,
-    /// which would otherwise be rejected because it already exists in the database.
+    /// Implements input validation of an edited string that will be used as a credential identifier.<br/>
+    /// This extends <see cref="IdentifierValidator"/> by allowing an unchanged identifier,
+    ///  which would otherwise be rejected because it already exists in the database.
     /// </summary>
-    /// <param name="database">A reference to the credentials database.</param>
-    /// <param name="prevAccountName">The previous name assigned to the account that is being modified.</param>
-    internal class AccountNameEditValidator(Database? database, string prevAccountName)
-        : AccountNameValidator(database)
+    internal class IdentifierEditValidator : IValidator<string>
     {
-        public override ValidationResult Validate(string accountName)
+        public static string? PreviousValue { private get; set; } = null;
+
+        public static ValidationResult Validate(string identifier)
         {
-            if (string.Compare(accountName, prevAccountName, StringComparison.Ordinal) == 0)
+            // Previous value must be set before using this validator
+            ArgumentNullException.ThrowIfNull(PreviousValue, nameof(PreviousValue));
+
+            if (string.Compare(identifier, PreviousValue, StringComparison.Ordinal) == 0)
                 return ValidationResult.Success();
-            else return base.Validate(accountName);
-        }
-
-        public override ValidationResult Validate(SecretString _)
-        {
-            // AccountNameEditValidator should never be used with SecretString objects
-            throw new NotSupportedException();
+            else return IdentifierValidator.Validate(identifier);
         }
     }
 
 
     /// <summary>
-    /// Implements validation of a string input that represents an account's password.
+    /// Implements input validation of a SecretString that represents an account's password.
     /// </summary>
-    internal class PasswordValidator : IValidator
+    internal class PasswordValidator : IValidator<SecretString>
     {
-        public ValidationResult Validate(string _)
-        {
-            // PasswordValidator should NEVER be used with plain .NET strings
-            throw new NotSupportedException();
-        }
-
-        public ValidationResult Validate(SecretString password)
+        public static ValidationResult Validate(SecretString password)
         {
             // Check that the password is not empty/whitespace and contains atleast 3 characters
             if (SecretString.IsNullOrWhiteSpace(password))
@@ -156,11 +139,11 @@ namespace PasswordBank.Application
 
 
     /// <summary>
-    /// Implements validation of a string input that will be used as the database's master password.<br/>
+    /// Implements input validation of a SecretString that will be used as master password.<br/>
     /// In addition to basic validity checks, this also makes sure that the master password satisfies
     ///  a set of minimum strength requirements.
     /// </summary>
-    internal class MasterPasswordValidator : IValidator
+    internal class MasterPasswordValidator : IValidator<SecretString>
     {
         private static readonly SearchValues<char> lowercase = SearchValues.Create
         (
@@ -183,13 +166,7 @@ namespace PasswordBank.Application
              '{', '|', '}', '~', '€', '¢', '£',  '¥', '¬', '¦', '—', '°', '¿', 'µ']
         );
 
-        public ValidationResult Validate(string _)
-        {
-            // MasterPasswordValidator should NEVER be used with plain .NET strings
-            throw new NotSupportedException();
-        }
-
-        public ValidationResult Validate(SecretString masterPassword)
+        public static ValidationResult Validate(SecretString masterPassword)
         {
             /* Check that the master password satisfies the following password strength requirements:
              *  - At least 12 characters long
@@ -203,7 +180,7 @@ namespace PasswordBank.Application
             else if (masterPassword.GetLength() > 256)
                 return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
             else if (masterPassword.GetLength() < 12)
-                return ValidationResult.Error("The master password must be at least 10 characters long.");
+                return ValidationResult.Error("The master password must be at least 12 characters long.");
             else if (!masterPassword.ContainsAny(lowercase))
                 return ValidationResult.Error("The master password must contain at least 1 lowercase letter.");
             else if (!masterPassword.ContainsAny(uppercase))

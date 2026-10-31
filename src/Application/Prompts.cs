@@ -74,9 +74,10 @@ internal partial class Program
     /// which prevent the prompt from returning until the user provides a valid input.
     /// </summary>
     /// <param name="prompt">The Spectre.Console TextPrompt object to wrap.</param>
-    /// <param name="validator">An object implementing the IValidator interface for validating the input text.</param>
+    /// <typeparam name="Validator">The type of input validator to use for this prompt.</typeparam>
     /// <returns>The (valid) text input provided by the user.</returns>
-    internal static string ValidatedTextPrompt(TextPrompt<string> prompt, IValidator validator)
+    internal static string PlaintextPrompt<Validator>(TextPrompt<string> prompt)
+        where Validator : IValidator<string>
     {
         // Store the row number before the prompt
         (int column, int row) = Console.GetCursorPosition();
@@ -95,7 +96,7 @@ internal partial class Program
             if (string.IsNullOrEmpty(input) && prompt.AllowEmpty)
                 return input;
 
-            ValidationResult result = validator.Validate(input);
+            ValidationResult result = Validator.Validate(input);
             if (!result.Successful)
             {
                 // Print error message and set the current input as the default value
@@ -115,7 +116,8 @@ internal partial class Program
     }
 
 
-    internal static SecretString ValidatedSecretPrompt(string title, IValidator validator, SecretString? editableValue = null)
+    internal static SecretString SecretPrompt<Validator>(string title, SecretString? editableValue = null)
+        where Validator : IValidator<SecretString>
     {
         // Store the row number before the prompt
         (int column, int row) = Console.GetCursorPosition();
@@ -130,7 +132,7 @@ internal partial class Program
             SecretString input = ConsoleHelper.SecretTextInput(editableValue);
             editableValue?.Zeroise();
 
-            ValidationResult result = validator.Validate(input);
+            ValidationResult result = Validator.Validate(input);
             if (!result.Successful)
             {
                 // Print error message and set the current input as the default value

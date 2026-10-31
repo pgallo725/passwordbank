@@ -81,14 +81,12 @@ internal partial class Program
         ConsoleHelper.SaveCheckpoint();
         while (true)
         {
-            using SecretString masterPassword = ValidatedSecretPrompt(
-                $"Choose your [{ColorPalette.SECONDARY}]master password[/]:",
-                new MasterPasswordValidator()
+            using SecretString masterPassword = SecretPrompt<MasterPasswordValidator>(
+                $"Choose your [{ColorPalette.SECONDARY}]master password[/]:"
                 );
 
-            using SecretString confirmPassword = ValidatedSecretPrompt(
-                $"Confirm your [{ColorPalette.SECONDARY}]master password[/]:",
-                new BasicValidator()
+            using SecretString confirmPassword = SecretPrompt<BasicValidator>(
+                $"Confirm your [{ColorPalette.SECONDARY}]master password[/]:"
                 );
 
             if (masterPassword.ContentEquals(confirmPassword))
@@ -164,14 +162,12 @@ internal partial class Program
         if (database is null)
             return;
 
-        using SecretString newPassword = ValidatedSecretPrompt(
-            $"Choose your new [{ColorPalette.SECONDARY}]master password[/]:",
-            new MasterPasswordValidator()
+        using SecretString newPassword = SecretPrompt<MasterPasswordValidator>(
+            $"Choose your new [{ColorPalette.SECONDARY}]master password[/]:"
             );
 
-        using SecretString confirmPassword = ValidatedSecretPrompt(
-            $"Confirm your new [{ColorPalette.SECONDARY}]master password[/]:",
-            new BasicValidator()
+        using SecretString confirmPassword = SecretPrompt<BasicValidator>(
+            $"Confirm your new [{ColorPalette.SECONDARY}]master password[/]:"
             );
 
         if (newPassword.ContentEquals(confirmPassword))
@@ -252,10 +248,9 @@ internal partial class Program
             """);
 
         // Get the search string from user input
-        string searchString = ValidatedTextPrompt(
+        string searchString = PlaintextPrompt<BasicValidator>(
             new TextPrompt<string>($"[{ColorPalette.SECONDARY}]Search[/] for:")
-                .ClearOnFinish(true),
-            new BasicValidator()
+                .ClearOnFinish(true)
             );
 
         // Retrieve the list of credentials from the database
@@ -332,30 +327,28 @@ internal partial class Program
         AnsiConsole.WriteLine("Please insert the requested credential information:");
         AnsiConsole.WriteLine();
 
+        // Set the active database reference in IdentifierValidator
+        IdentifierValidator.Database = database;
+
         using PlaintextCredential plaintextCredential = new()
         {
-            Name = ValidatedTextPrompt(new TextPrompt<string>(
-                $"[{ColorPalette.SECONDARY}] - Identifier:[/]")
-                    .ClearOnFinish(false),
-                new AccountNameValidator(database)
+            Name = PlaintextPrompt<IdentifierValidator>(
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Identifier:[/]")
+                    .ClearOnFinish(false)
             ),
-            EmailAddress = ValidatedTextPrompt(new TextPrompt<string>(
-                $"[{ColorPalette.SECONDARY}] - Email Address:[/] [{ColorPalette.NEUTRAL}](optional)[/]")
+            EmailAddress = PlaintextPrompt<EmailAddressValidator>(
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Email Address:[/] [{ColorPalette.NEUTRAL}](optional)[/]")
                     .AllowEmpty()
-                    .ClearOnFinish(false),
-                new EmailAddressValidator()
+                    .ClearOnFinish(false)
             ),
-            Username = ValidatedTextPrompt(new TextPrompt<string>(
-                $"[{ColorPalette.SECONDARY}] - Username:[/] [{ColorPalette.NEUTRAL}](optional)[/]")
+            Username = PlaintextPrompt<BasicValidator>(
+                new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Username:[/] [{ColorPalette.NEUTRAL}](optional)[/]")
                     .AllowEmpty()
-                    .ClearOnFinish(false),
-                new BasicValidator()
+                    .ClearOnFinish(false)
             ),
-            Password = ValidatedSecretPrompt(
-                $"[{ColorPalette.SECONDARY}] - Password:[/]",
-                new PasswordValidator()
-            )
+            Password = SecretPrompt<PasswordValidator>($"[{ColorPalette.SECONDARY}] - Password:[/]")
         };
+        IdentifierValidator.Database = null;
 
         // Encrypt the account information before adding it to the database
         KeyGenerator keygen = database.GetKeyGenerator();
@@ -403,39 +396,42 @@ internal partial class Program
         KeyGenerator keygen = database.GetKeyGenerator();
         using PlaintextCredential plaintextCredential = credential.Decrypt(keygen, masterPassword);
 
-        plaintextCredential.Name = ValidatedTextPrompt(
+        // Initialize the static parameters of IdentifierEditValidator
+        IdentifierValidator.Database = database;
+        IdentifierEditValidator.PreviousValue = plaintextCredential.Name;
+
+        plaintextCredential.Name = PlaintextPrompt<IdentifierEditValidator>(
             new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Identifier:[/]")
                 .DefaultValue(plaintextCredential.Name)
                 .EditableDefaultValue(true)
                 .HideDefaultValue()
-                .ClearOnFinish(false),
-            new AccountNameEditValidator(database, plaintextCredential.Name)
+                .ClearOnFinish(false)
             );
 
-        plaintextCredential.EmailAddress = ValidatedTextPrompt(
+        plaintextCredential.EmailAddress = PlaintextPrompt<EmailAddressValidator>(
             new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Email Address:[/]")
                 .DefaultValue(plaintextCredential.EmailAddress ?? string.Empty)
                 .EditableDefaultValue(true)
                 .HideDefaultValue()
                 .AllowEmpty()
-                .ClearOnFinish(false),
-            new EmailAddressValidator()
+                .ClearOnFinish(false)
             );
 
-        plaintextCredential.Username = ValidatedTextPrompt(
+        plaintextCredential.Username = PlaintextPrompt<BasicValidator>(
             new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Username:[/]")
                 .DefaultValue(plaintextCredential.Username ?? string.Empty)
                 .EditableDefaultValue(true)
                 .HideDefaultValue()
                 .AllowEmpty()
-                .ClearOnFinish(false),
-            new BasicValidator()
+                .ClearOnFinish(false)
             );
 
-        plaintextCredential.Password = ValidatedSecretPrompt(
-            $"[{ColorPalette.SECONDARY}] - Password:[/]",
-            new PasswordValidator(), plaintextCredential.Password
+        plaintextCredential.Password = SecretPrompt<PasswordValidator>(
+            $"[{ColorPalette.SECONDARY}] - Password:[/]", plaintextCredential.Password
             );
+
+        IdentifierValidator.Database = null;
+        IdentifierEditValidator.PreviousValue = null;
 
         // Encrypt the account information before writing it to the database
         EncryptedCredential updatedCredential = plaintextCredential.Encrypt(keygen, masterPassword);
