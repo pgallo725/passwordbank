@@ -12,7 +12,9 @@ internal partial class Program
     /// Prompts the user to input the master password and then verifies its correctness against the database.
     /// </summary>
     /// <param name="inputPassword">The user-provided password (regardless of its correctness).</param>
-    /// <returns>An open connection to the credentials database in case of success, otherwise null.</returns>
+    /// <returns>
+    /// An open connection to the credentials database in case of success, otherwise null.
+    /// </returns>
     internal static Database? AuthenticationPrompt(out SecretString inputPassword)
     {
         AnsiConsole.Markup($"[{ColorPalette.NEUTRAL}]>> AUTHENTICATION[/]");
