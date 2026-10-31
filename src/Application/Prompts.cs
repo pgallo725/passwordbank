@@ -75,7 +75,9 @@ internal partial class Program
     /// </summary>
     /// <param name="prompt">The Spectre.Console TextPrompt object to wrap.</param>
     /// <typeparam name="Validator">The type of input validator to use for this prompt.</typeparam>
-    /// <returns>The (valid) text input provided by the user.</returns>
+    /// <returns>
+    /// The (valid) text input provided by the user.
+    /// </returns>
     internal static string PlaintextPrompt<Validator>(TextPrompt<string> prompt)
         where Validator : IValidator<string>
     {
@@ -116,6 +118,15 @@ internal partial class Program
     }
 
 
+    /// <summary>
+    /// Replaces regular Spectre.Console prompts in order to support <see cref="SecretString"/> as result type.
+    /// </summary>
+    /// <typeparam name="Validator">The type of input validator to use for this prompt.</typeparam>
+    /// <param name="title">The text to be shown in the user-facing prompt.</param>
+    /// <param name="editableValue">If provided, the input field is initialized with this value that the user can edit.</param>
+    /// <returns>
+    /// The (valid) secret text input provided by the user.
+    /// </returns>
     internal static SecretString SecretPrompt<Validator>(string title, SecretString? editableValue = null)
         where Validator : IValidator<SecretString>
     {
