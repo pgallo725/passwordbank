@@ -162,10 +162,6 @@ namespace PasswordBank.Application
     /// </summary>
     internal class MasterPasswordValidator : IValidator
     {
-        private static readonly SearchValues<char> digits = SearchValues.Create
-        (
-            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-        );
         private static readonly SearchValues<char> lowercase = SearchValues.Create
         (
             ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
@@ -175,6 +171,16 @@ namespace PasswordBank.Application
         (
             ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
              'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
+        );
+        private static readonly SearchValues<char> digits = SearchValues.Create
+        (
+            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+        );
+        private static readonly SearchValues<char> symbols = SearchValues.Create
+        (
+            ['!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '+',
+             '/', ':', ';', '<', '=', '>', '?', '\\', '[', '@', ']', '^', '_', '`',
+             '{', '|', '}', '~', '€', '¢', '£',  '¥', '¬', '¦', '—', '°', '¿', 'µ']
         );
 
         public ValidationResult Validate(string _)
@@ -186,23 +192,26 @@ namespace PasswordBank.Application
         public ValidationResult Validate(SecretString masterPassword)
         {
             /* Check that the master password satisfies the following password strength requirements:
-             *  - At least 8 characters long
+             *  - At least 12 characters long
              *  - At least 1 lowercase letter
              *  - At least 1 uppercase letter
              *  - At least 1 digit character
+             *  - At least 1 symbol character
              */
             if (SecretString.IsNullOrWhiteSpace(masterPassword))
                 return ValidationResult.Error("A password must not be empty or made only of whitespace characters.");
             else if (masterPassword.GetLength() > 256)
                 return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
-            else if (masterPassword.GetLength() < 8)
-                return ValidationResult.Error("The master password must be at least 8 characters long.");
+            else if (masterPassword.GetLength() < 12)
+                return ValidationResult.Error("The master password must be at least 10 characters long.");
             else if (!masterPassword.ContainsAny(lowercase))
                 return ValidationResult.Error("The master password must contain at least 1 lowercase letter.");
             else if (!masterPassword.ContainsAny(uppercase))
                 return ValidationResult.Error("The master password must contain at least 1 uppercase letter.");
             else if (!masterPassword.ContainsAny(digits))
                 return ValidationResult.Error("The master password must contain at least 1 digit character.");
+            else if (!masterPassword.ContainsAny(symbols))
+                return ValidationResult.Error("The master password must contain at least 1 symbol character.");
             else return ValidationResult.Success();
         }
     }
