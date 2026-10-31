@@ -119,10 +119,19 @@ internal partial class Program
 
                         while (true)
                         {
+                            // Re-print action title and authentication message
+                            AnsiConsole.MarkupLine(mainAction switch
+                            {
+                                MainMenuAction.View => $"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]LIST CREDENTIAL RECORDS[/]",
+                                MainMenuAction.Search => $"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]SEARCH CREDENTIAL RECORDS[/]",
+                                _ => throw new UnreachableException()
+                            });
+                            AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> AUTHENTICATION[/] [{ColorPalette.PRIMARY}]SUCCESSFUL[/]\n");
+
                             // Display the number of credential records in the list
                             AnsiConsole.MarkupLine(mainAction switch
                             {
-                                MainMenuAction.View => $"[{ColorPalette.NEUTRAL}]Showing [bold]{credentials.Count}[/] database records.[/]",
+                                MainMenuAction.View => $"[{ColorPalette.NEUTRAL}]Showing [bold]{credentials.Count}[/] credential records.[/]",
                                 MainMenuAction.Search => $"[{ColorPalette.NEUTRAL}]Search found [bold]{credentials.Count}[/] relevant result(s).[/]",
                                 _ => throw new UnreachableException()
                             });
@@ -130,12 +139,12 @@ internal partial class Program
                             // Display the list of credentials and let the user select one
                             EncryptedCredential credential = AnsiConsole.Prompt(
                                 new SelectionPrompt<EncryptedCredential>()
-                                    .Title($"Select a [{ColorPalette.PRIMARY}]credential record[/] to access further options:")
+                                    .Title($"Select an item to access further options:")
                                     .UseConverter(c => Markup.Escape(c.Name))
                                     .AddChoices(credentials)
                                     .AddChoices(NullCredential)
                                     .AddCancelResult(NullCredential)
-                                    .PageSize(10)
+                                    .PageSize(8)
                                     .MoreChoicesText($"[{ColorPalette.NEUTRAL}](Use the UP/DOWN arrow keys to navigate all records)[/]")
                                     .WrapAround(true)
                                     .HighlightStyle(Styles.HIGHLIGHT)

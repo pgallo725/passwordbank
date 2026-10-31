@@ -242,8 +242,8 @@ internal partial class Program
             return null;
 
         AnsiConsole.MarkupLine($"""
-            [{ColorPalette.NEUTRAL_LIGHT}]Find credential records in the database whose identifier or email
-            address fields match (even partially) with the provided search string.[/]
+            [{ColorPalette.NEUTRAL_LIGHT}]Find credential records in the database whose identifier or email address
+            fields match (exactly or even partially) with the provided search string.[/]
 
             """);
 
