@@ -171,7 +171,7 @@ internal partial class Program
             // Position the cursor at the beginning of the next line
             // NOTE: ANSI cursor positions are 1-based
             AnsiConsole.Cursor.MoveDown();
-            AnsiConsole.Cursor.MoveLeft(Console.GetCursorPosition().Left);
+            AnsiConsole.Cursor.MoveLeft(Console.CursorLeft);
 
             ValidationResult result = TValidator.Validate(input, context);
             if (!result.Successful)
