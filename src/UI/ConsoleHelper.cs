@@ -45,9 +45,17 @@ namespace PasswordBank.UI
                     {
                         if (length > 0)
                         {
-                            AnsiConsole.Cursor.MoveLeft();
-                            AnsiConsole.Write(' ');
-                            AnsiConsole.Cursor.MoveLeft();
+                            if (Console.CursorLeft > 0)
+                            {
+                                AnsiConsole.Cursor.MoveLeft();
+                            }
+                            else // wrap to the previous line
+                            {
+                                AnsiConsole.Cursor.MoveUp();
+                                AnsiConsole.Cursor.MoveRight(Console.LargestWindowWidth);
+                            }
+                            // Erase next character without moving the cursor
+                            AnsiConsole.Write("\x1b[1P");
                             length--;
                         }
                         continue;
