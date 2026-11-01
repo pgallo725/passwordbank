@@ -7,6 +7,18 @@ using System.Net.Mail;
 namespace PasswordBank.Application
 {
     /// <summary>
+    /// A struct used to pass state and data to <see cref="IValidator{T}"/> static types.
+    /// </summary>
+    /// <param name="Database">A database reference, useful to query some data during validation.</param>
+    /// <param name="PreviousIdentifier">The previous value of an identifier (used by <see cref="IdentifierValidator"/>).</param>
+    internal readonly record struct ValidationContext
+    (
+        Database? Database = null,
+        string? PreviousIdentifier = null
+    );
+
+
+    /// <summary>
     /// Generic interface to implement input validation.
     /// </summary>
     internal interface IValidator<T>
@@ -15,10 +27,11 @@ namespace PasswordBank.Application
         /// Validates an input value using a set of implementation-defined rules.
         /// </summary>
         /// <param name="value">The input value to validate.</param>
+        /// <param name="context">Additional data required to validate the input value.</param>
         /// <returns>
         /// A <see cref="ValidationResult"/> with the outcome of the validation checks.
         /// </returns>
-        public static abstract ValidationResult Validate(T value);
+        public static abstract ValidationResult Validate(T value, ValidationContext context);
     }
 
 
@@ -27,7 +40,7 @@ namespace PasswordBank.Application
     /// </summary>
     internal class NullValidator<T> : IValidator<T>
     {
-        public static ValidationResult Validate(T value)
+        public static ValidationResult Validate(T value, ValidationContext context)
         {
             return ValidationResult.Success();
         }
@@ -39,14 +52,14 @@ namespace PasswordBank.Application
     /// </summary>
     internal class BasicValidator : IValidator<string>, IValidator<SecretString>
     {
-        public static ValidationResult Validate(string value)
+        public static ValidationResult Validate(string value, ValidationContext context)
         {
             if (value.Length > 256)
                 return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
             return ValidationResult.Success();
         }
 
-        public static ValidationResult Validate(SecretString value)
+        public static ValidationResult Validate(SecretString value, ValidationContext context)
         {
             if (value.GetLength() > 256)
                 return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
@@ -60,7 +73,7 @@ namespace PasswordBank.Application
     /// </summary>
     internal class EmailAddressValidator : IValidator<string>
     {
-        public static ValidationResult Validate(string emailAddress)
+        public static ValidationResult Validate(string emailAddress, ValidationContext context)
         {
             // Consider an email address correct if it can be used to construct a valid MailAddress object
             if (emailAddress.Length > 256)
@@ -77,44 +90,20 @@ namespace PasswordBank.Application
     /// </summary>
     internal class IdentifierValidator : IValidator<string>
     {
-        public static Database? Database { private get; set; } = null;
-
-        public static ValidationResult Validate(string identifier)
+        public static ValidationResult Validate(string identifier, ValidationContext context)
         {
-            // Database handle must be set before using this validator
-            ArgumentNullException.ThrowIfNull(Database, nameof(Database));
+            if (context.Database is null)
+                throw new ArgumentNullException(nameof(context), "A database is required to validate an identifier.");
 
-            // Check that the identifier is not empty and doesn't already exist in the database
             if (string.IsNullOrWhiteSpace(identifier))
                 return ValidationResult.Error("An identifier must contain atleast 1 non-whitespace character.");
             else if (identifier.Length > 256)
                 return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
-            else if (Database is null)
-                return ValidationResult.Error("Cannot access the database for checking the identifier.");
-            else if (Database.Contains(identifier))
+            else if (string.Equals(identifier, context.PreviousIdentifier, StringComparison.Ordinal))
+                return ValidationResult.Success();
+            else if (context.Database.Contains(identifier))
                 return ValidationResult.Error("A credential with the same identifier already exists in the database.");
             else return ValidationResult.Success();
-        }
-    }
-
-
-    /// <summary>
-    /// Implements input validation of an edited string that will be used as a credential identifier.<br/>
-    /// This extends <see cref="IdentifierValidator"/> by allowing an unchanged identifier,
-    ///  which would otherwise be rejected because it already exists in the database.
-    /// </summary>
-    internal class IdentifierEditValidator : IValidator<string>
-    {
-        public static string? PreviousValue { private get; set; } = null;
-
-        public static ValidationResult Validate(string identifier)
-        {
-            // Previous value must be set before using this validator
-            ArgumentNullException.ThrowIfNull(PreviousValue, nameof(PreviousValue));
-
-            if (string.Compare(identifier, PreviousValue, StringComparison.Ordinal) == 0)
-                return ValidationResult.Success();
-            else return IdentifierValidator.Validate(identifier);
         }
     }
 
@@ -124,7 +113,7 @@ namespace PasswordBank.Application
     /// </summary>
     internal class PasswordValidator : IValidator<SecretString>
     {
-        public static ValidationResult Validate(SecretString password)
+        public static ValidationResult Validate(SecretString password, ValidationContext context)
         {
             // Check that the password is not empty/whitespace and contains atleast 3 characters
             if (SecretString.IsNullOrWhiteSpace(password))
@@ -166,7 +155,7 @@ namespace PasswordBank.Application
              '{', '|', '}', '~', '€', '¢', '£',  '¥', '¬', '¦', '—', '°', '¿', 'µ']
         );
 
-        public static ValidationResult Validate(SecretString masterPassword)
+        public static ValidationResult Validate(SecretString masterPassword, ValidationContext context)
         {
             /* Check that the master password satisfies the following password strength requirements:
              *  - At least 12 characters long

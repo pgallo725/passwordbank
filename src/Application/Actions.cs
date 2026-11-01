@@ -26,7 +26,7 @@ internal partial class Program
         {
             MainMenuAction.View           => $"[{ColorPalette.PRIMARY}]View[/] the list of all your credentials",
             MainMenuAction.Search         => $"[{ColorPalette.PRIMARY}]Search[/] for specific records in the database",
-            MainMenuAction.Add            => $"[{ColorPalette.PRIMARY}]Add[/] new credentials to the database",
+            MainMenuAction.Add            => $"[{ColorPalette.PRIMARY}]Add[/] new credentials to the encrypted database",
             MainMenuAction.ChangePassword => $"[{ColorPalette.PRIMARY}]Change[/] your master password [{ColorPalette.NEUTRAL}](recommended periodically)[/]",
             MainMenuAction.Quit           => $"[{ColorPalette.PRIMARY}]Quit[/] the application",
             _ => throw new ArgumentOutOfRangeException(nameof(action)),
@@ -327,14 +327,12 @@ internal partial class Program
         AnsiConsole.WriteLine("Please insert the requested credential information:");
         AnsiConsole.WriteLine();
 
-        // Set the active database reference in IdentifierValidator
-        IdentifierValidator.Database = database;
-
         using PlaintextCredential plaintextCredential = new()
         {
             Name = PlaintextPrompt<IdentifierValidator>(
                 new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Identifier:[/]")
-                    .ClearOnFinish(false)
+                    .ClearOnFinish(false),
+                new ValidationContext(database)
             ),
             EmailAddress = PlaintextPrompt<EmailAddressValidator>(
                 new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Email Address:[/] [{ColorPalette.NEUTRAL}](optional)[/]")
@@ -348,8 +346,6 @@ internal partial class Program
             ),
             Password = SecretPrompt<PasswordValidator>($"[{ColorPalette.SECONDARY}] - Password:[/]")
         };
-        IdentifierValidator.Database = null;
-
         // Encrypt the account information before adding it to the database
         KeyGenerator keygen = database.GetKeyGenerator();
         EncryptedCredential encryptedCredential = plaintextCredential.Encrypt(keygen, masterPassword);
@@ -396,16 +392,13 @@ internal partial class Program
         KeyGenerator keygen = database.GetKeyGenerator();
         using PlaintextCredential plaintextCredential = credential.Decrypt(keygen, masterPassword);
 
-        // Initialize the static parameters of IdentifierEditValidator
-        IdentifierValidator.Database = database;
-        IdentifierEditValidator.PreviousValue = plaintextCredential.Name;
-
-        plaintextCredential.Name = PlaintextPrompt<IdentifierEditValidator>(
+        plaintextCredential.Name = PlaintextPrompt<IdentifierValidator>(
             new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Identifier:[/]")
                 .DefaultValue(plaintextCredential.Name)
                 .EditableDefaultValue(true)
                 .HideDefaultValue()
-                .ClearOnFinish(false)
+                .ClearOnFinish(false),
+            new ValidationContext(database, plaintextCredential.Name)
             );
 
         plaintextCredential.EmailAddress = PlaintextPrompt<EmailAddressValidator>(
@@ -429,9 +422,6 @@ internal partial class Program
         plaintextCredential.Password = SecretPrompt<PasswordValidator>(
             $"[{ColorPalette.SECONDARY}] - Password:[/]", plaintextCredential.Password
             );
-
-        IdentifierValidator.Database = null;
-        IdentifierEditValidator.PreviousValue = null;
 
         // Encrypt the account information before writing it to the database
         EncryptedCredential updatedCredential = plaintextCredential.Encrypt(keygen, masterPassword);

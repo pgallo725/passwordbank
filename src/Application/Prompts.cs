@@ -76,12 +76,13 @@ internal partial class Program
     /// which prevent the prompt from returning until the user provides a valid input.
     /// </summary>
     /// <param name="prompt">The Spectre.Console TextPrompt object to wrap.</param>
-    /// <typeparam name="Validator">The type of input validator to use for this prompt.</typeparam>
+    /// <param name="context">A context struct containing any data or state that the validator might need.</param>
+    /// <typeparam name="TValidator">The type of input validator to use for this prompt.</typeparam>
     /// <returns>
     /// The (valid) text input provided by the user.
     /// </returns>
-    internal static string PlaintextPrompt<Validator>(TextPrompt<string> prompt)
-        where Validator : IValidator<string>
+    internal static string PlaintextPrompt<TValidator>(TextPrompt<string> prompt, ValidationContext context = default)
+        where TValidator : IValidator<string>
     {
         // Store the row number before the prompt
         (int column, int row) = Console.GetCursorPosition();
@@ -100,7 +101,7 @@ internal partial class Program
             if (string.IsNullOrEmpty(input) && prompt.AllowEmpty)
                 return input;
 
-            ValidationResult result = Validator.Validate(input);
+            ValidationResult result = TValidator.Validate(input, context);
             if (!result.Successful)
             {
                 // Print error message and set the current input as the default value
@@ -123,14 +124,16 @@ internal partial class Program
     /// <summary>
     /// Replaces regular Spectre.Console prompts in order to support <see cref="SecretString"/> as result type.
     /// </summary>
-    /// <typeparam name="Validator">The type of input validator to use for this prompt.</typeparam>
+    /// <typeparam name="TValidator">The type of input validator to use for this prompt.</typeparam>
     /// <param name="title">The text to be shown in the user-facing prompt.</param>
     /// <param name="editableValue">If provided, the input field is initialized with this value that the user can edit.</param>
+    /// <param name="context">A context struct containing any data or state that the validator might need.</param>
     /// <returns>
     /// The (valid) secret text input provided by the user.
     /// </returns>
-    internal static SecretString SecretPrompt<Validator>(string title, SecretString? editableValue = null)
-        where Validator : IValidator<SecretString>
+    internal static SecretString SecretPrompt<TValidator>(
+        string title, SecretString? editableValue = null, ValidationContext context = default)
+        where TValidator : IValidator<SecretString>
     {
         // Store the row number before the prompt
         (int column, int row) = Console.GetCursorPosition();
@@ -145,7 +148,7 @@ internal partial class Program
             SecretString input = ConsoleHelper.SecretTextInput(editableValue);
             editableValue?.Zeroise();
 
-            ValidationResult result = Validator.Validate(input);
+            ValidationResult result = TValidator.Validate(input, context);
             if (!result.Successful)
             {
                 // Print error message and set the current input as the default value
