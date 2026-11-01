@@ -9,7 +9,7 @@ namespace PasswordBank.UI
     {
         public static SecretString SecretTextInput(SecretString? initialString = null)
         {
-            const int MAX_SECRET_LENGTH = 256;
+            const int MAX_SECRET_LENGTH = 128;
             Span<char> input = stackalloc char[MAX_SECRET_LENGTH];
             int length = 0;
 

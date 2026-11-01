@@ -54,15 +54,15 @@ namespace PasswordBank.Application
     {
         public static ValidationResult Validate(string value, ValidationContext context)
         {
-            if (value.Length > 256)
-                return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
+            if (value.Length > 128)
+                return ValidationResult.Error("The input length is limited to a maximum of 128 characters.");
             return ValidationResult.Success();
         }
 
         public static ValidationResult Validate(SecretString value, ValidationContext context)
         {
-            if (value.GetLength() > 256)
-                return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
+            if (value.GetLength() > 128)
+                return ValidationResult.Error("The input length is limited to a maximum of 128 characters.");
             return ValidationResult.Success();
         }
     }
@@ -76,8 +76,8 @@ namespace PasswordBank.Application
         public static ValidationResult Validate(string emailAddress, ValidationContext context)
         {
             // Consider an email address correct if it can be used to construct a valid MailAddress object
-            if (emailAddress.Length > 256)
-                return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
+            if (emailAddress.Length > 128)
+                return ValidationResult.Error("The input length is limited to a maximum of 128 characters.");
             else if (MailAddress.TryCreate(emailAddress, out var _))
                 return ValidationResult.Success();
             else return ValidationResult.Error("The input does not match the format of a valid email address.");
@@ -97,8 +97,8 @@ namespace PasswordBank.Application
 
             if (string.IsNullOrWhiteSpace(identifier))
                 return ValidationResult.Error("An identifier must contain atleast 1 non-whitespace character.");
-            else if (identifier.Length > 256)
-                return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
+            else if (identifier.Length > 128)
+                return ValidationResult.Error("The input length is limited to a maximum of 128 characters.");
             else if (string.Equals(identifier, context.PreviousIdentifier, StringComparison.Ordinal))
                 return ValidationResult.Success();
             else if (context.Database.Contains(identifier))
@@ -118,8 +118,8 @@ namespace PasswordBank.Application
             // Check that the password is not empty/whitespace and contains atleast 3 characters
             if (SecretString.IsNullOrWhiteSpace(password))
                 return ValidationResult.Error("A password must not be empty or made only of whitespace characters.");
-            else if (password.GetLength() > 256)
-                return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
+            else if (password.GetLength() > 128)
+                return ValidationResult.Error("The input length is limited to a maximum of 128 characters.");
             else if (password.GetLength() < 3)
                 return ValidationResult.Error("A password must contain at least 3 characters.");
             else return ValidationResult.Success();
@@ -166,8 +166,8 @@ namespace PasswordBank.Application
              */
             if (SecretString.IsNullOrWhiteSpace(masterPassword))
                 return ValidationResult.Error("A password must not be empty or made only of whitespace characters.");
-            else if (masterPassword.GetLength() > 256)
-                return ValidationResult.Error("The input length is limited to a maximum of 256 characters.");
+            else if (masterPassword.GetLength() > 128)
+                return ValidationResult.Error("The input length is limited to a maximum of 128 characters.");
             else if (masterPassword.GetLength() < 12)
                 return ValidationResult.Error("The master password must be at least 12 characters long.");
             else if (!masterPassword.ContainsAny(lowercase))
