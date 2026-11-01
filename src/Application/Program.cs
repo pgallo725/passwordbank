@@ -119,14 +119,14 @@ internal partial class Program
 
                         while (true)
                         {
-                            // Re-print action title and authentication message
+                            // Re-print action title
+                            // NOTE: needed because we can get here by navigating back from the credential actions menu
                             AnsiConsole.MarkupLine(mainAction switch
                             {
-                                MainMenuAction.View => $"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]LIST CREDENTIAL RECORDS[/]",
-                                MainMenuAction.Search => $"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]SEARCH CREDENTIAL RECORDS[/]",
+                                MainMenuAction.View => $"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]LIST CREDENTIAL RECORDS[/]\n",
+                                MainMenuAction.Search => $"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]SEARCH CREDENTIAL RECORDS[/]\n",
                                 _ => throw new UnreachableException()
                             });
-                            AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> AUTHENTICATION[/] [{ColorPalette.PRIMARY}]SUCCESSFUL[/]\n");
 
                             // Display the number of credential records in the list
                             AnsiConsole.MarkupLine(mainAction switch
@@ -144,7 +144,7 @@ internal partial class Program
                                     .AddChoices(credentials)
                                     .AddChoices(NullCredential)
                                     .AddCancelResult(NullCredential)
-                                    .PageSize(8)
+                                    .PageSize(9)
                                     .MoreChoicesText($"[{ColorPalette.NEUTRAL}](Use the UP/DOWN arrow keys to navigate all records)[/]")
                                     .WrapAround(true)
                                     .HighlightStyle(Styles.HIGHLIGHT)
