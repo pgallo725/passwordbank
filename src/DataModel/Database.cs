@@ -59,6 +59,9 @@ namespace PasswordBank.DataModel
         /// </summary>
         /// <param name="password">The password to use for encrypting the database.</param>
         /// <exception cref="ApplicationException"></exception>
+        /// <returns>
+        /// A reference to the created database.
+        /// </returns>
         public static Database Create(SecretString password)
         {
             if (File.Exists(DatabaseFilePath))
@@ -189,8 +192,10 @@ namespace PasswordBank.DataModel
         /// Open a connection to an existing (encrypted) credentials database.
         /// </summary>
         /// <param name="password">The password used to encrypt the database.</param>
-        /// <returns>A reference to the opened database if the password was correct, otherwise null.</returns>
         /// <exception cref="ApplicationException"></exception>
+        /// <returns>
+        /// A reference to the opened database if the password was correct, otherwise null.
+        /// </returns>
         public static Database? Open(SecretString password)
         {
             if (!File.Exists(DatabaseFilePath))
@@ -316,7 +321,9 @@ namespace PasswordBank.DataModel
         /// <summary>
         /// Retrieve the encryption key generation salt from the database.
         /// </summary>
-        /// <returns>The byte array containing the salt to use for generating the AES-256 encryption key.</returns>
+        /// <returns>
+        /// The byte array containing the salt to use for generating the AES-256 encryption key.
+        /// </returns>
         private byte[] GetEncryptionSalt()
         {
             using var command = connection.CreateCommand();
@@ -334,7 +341,9 @@ namespace PasswordBank.DataModel
         /// <summary>
         /// Retrieve the verification hash generation salt from the database.
         /// </summary>
-        /// <returns>The byte array containing the salt to use for generating the PBKDF2 password hash for verification.</returns>
+        /// <returns>
+        /// The byte array containing the salt to use for generating the PBKDF2 password hash for verification.
+        /// </returns>
         private byte[] GetVerificationSalt()
         {
             using var command = connection.CreateCommand();
@@ -354,7 +363,9 @@ namespace PasswordBank.DataModel
         /// Safely check a user provided password against the one stored in the database.
         /// </summary>
         /// <param name="password">The password to verify.</param>
-        /// <returns>A boolean value indicating whether the password passed the verification or not.</returns>
+        /// <returns>
+        /// A boolean value indicating whether the password passed the verification or not.
+        /// </returns>
         public bool VerifyPassword(SecretString password)
         {
             if (password is null || password.GetLength() == 0)
@@ -410,7 +421,9 @@ namespace PasswordBank.DataModel
         /// <summary>
         /// Query the database for the total number of stored credentials.
         /// </summary>
-        /// <returns>The number of credentials in the database.</returns>
+        /// <returns>
+        /// The number of credentials in the database.
+        /// </returns>
         public long GetNumberOfCredentials()
         {
             using var command = connection.CreateCommand();
@@ -425,7 +438,9 @@ namespace PasswordBank.DataModel
         /// <summary>
         /// Query the database for a list of all stored credentials.
         /// </summary>
-        /// <returns>The list of credentials in the database.</returns>
+        /// <returns>
+        /// The list of credentials in the database.
+        /// </returns>
         public List<EncryptedCredential> GetCredentials()
         {
             using var command = connection.CreateCommand();
@@ -460,7 +475,9 @@ namespace PasswordBank.DataModel
         /// </summary>
         /// <param name="searchString">The string used for searching credential records.</param>
         /// <param name="maxResults">The maximum number of possible matches returned by this function.</param>
-        /// <returns>A limited list of records matching the search string.</returns>
+        /// <returns>
+        /// A limited list of records matching the search string.
+        /// </returns>
         public List<EncryptedCredential> Search(string searchString, int maxResults = 100)
         {
             ArgumentException.ThrowIfNullOrEmpty(searchString);
@@ -525,7 +542,9 @@ namespace PasswordBank.DataModel
         /// Insert a new credential into the database.
         /// </summary>
         /// <param name="record">The credential record to insert.</param>
-        /// <returns>A boolean value indicating whether the insertion succeeded or not.</returns>
+        /// <returns>
+        /// A boolean value indicating whether the insertion succeeded or not.
+        /// </returns>
         public bool Insert(EncryptedCredential record)
         {
             using var command = connection.CreateCommand();
@@ -549,7 +568,9 @@ namespace PasswordBank.DataModel
         /// </summary>
         /// <param name="oldRecord">The old credential record to update.</param>
         /// <param name="newRecord">The updated credential record.</param>
-        /// <returns>A boolean value indicating whether the update succeeded or not.</returns>
+        /// <returns>
+        /// A boolean value indicating whether the update succeeded or not.
+        /// </returns>
         public bool Update(EncryptedCredential oldRecord, EncryptedCredential newRecord)
         {
             using var command = connection.CreateCommand();
@@ -576,7 +597,9 @@ namespace PasswordBank.DataModel
         /// Remove a credential record from the database.
         /// </summary>
         /// <param name="record">The credential record to be removed.</param>
-        /// <returns>A boolean value indicating whether the removal succeeded or not.</returns>
+        /// <returns>
+        /// A boolean value indicating whether the removal succeeded or not.
+        /// </returns>
         public bool Remove(EncryptedCredential record)
         {
             using var command = connection.CreateCommand();
@@ -596,7 +619,9 @@ namespace PasswordBank.DataModel
         /// </summary>
         /// <param name="oldPassword">The password previously used to encrypt the database.</param>
         /// <param name="newPassword">The new password to use.</param>
-        /// <returns>A boolean value indicating whether the operation succeeded or not.</returns>
+        /// <returns>
+        /// A boolean value indicating whether the operation succeeded or not.
+        /// </returns>
         public bool ChangePassword(SecretString oldPassword, SecretString newPassword)
         {
             if (oldPassword is null || oldPassword.GetLength() == 0)
