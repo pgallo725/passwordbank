@@ -4,7 +4,7 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="Microsoft.Data.Sqlite.Core" Version="10.0.13" />
+    <PackageVersion Include="Microsoft.Data.Sqlite.Core" Version="10.0.14" />
     <PackageVersion Include="SQLite3MC.PCLRaw.bundle" Version="2.6.1" />
     <PackageVersion Include="Spectre.Console" Version="0.57.2" />
   </ItemGroup>
