@@ -28,7 +28,7 @@ internal partial class Program
 
         AnsiConsole.Cursor.Hide();
 
-        Database? database;
+        Database? database = null;
         bool isCorrectPassword;
         try
         {
@@ -37,6 +37,11 @@ internal partial class Program
 
             // Check the password against the key stored in the database
             isCorrectPassword = database?.VerifyPassword(inputPassword) ?? false;
+        }
+        catch (Exception)
+        {
+            database?.Dispose();  // close the database connection in case of failure
+            return null;
         }
         finally  // ensure this is executed even if the code above throws
         {
