@@ -470,8 +470,7 @@ namespace PasswordBank.DataModel
 
 
         /// <summary>
-        /// Search among the database for credentials whose identifier or email address matches<br/>
-        /// with the provided search string (partial matches supported on the identifier field).
+        /// Search the database for credentials whose identifier contains the provided search string.
         /// </summary>
         /// <param name="searchString">The string used for searching credential records.</param>
         /// <param name="maxResults">The maximum number of possible matches returned by this function.</param>
@@ -494,17 +493,15 @@ namespace PasswordBank.DataModel
             while (entries.Count < maxResults && reader.Read())
             {
                 string identifier = reader.GetString(0);
-                string emailAddress = reader.IsDBNull(1) ? string.Empty : reader.GetString(1);
 
                 // TODO: employ a Levenshtein distance based search for more accurate results
-                if (identifier.Contains(searchString, StringComparison.OrdinalIgnoreCase) ||
-                    emailAddress.Equals(searchString, StringComparison.OrdinalIgnoreCase))
+                if (identifier.Contains(searchString, StringComparison.OrdinalIgnoreCase))
                 {
                     // Create entry with the values read from the DB
                     EncryptedCredential credential = new()
                     {
                         Name              = identifier,
-                        EmailAddress      = emailAddress == string.Empty ? null : emailAddress,
+                        EmailAddress      = reader.IsDBNull(1) ? null : reader.GetString(1),
                         Username          = reader.IsDBNull(2) ? null : reader.GetString(2),
                         EncryptionNonce   = reader.GetFieldValue<byte[]>(3),
                         EncryptedPassword = reader.GetFieldValue<byte[]>(4),

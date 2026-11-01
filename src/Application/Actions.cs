@@ -224,8 +224,7 @@ internal partial class Program
     /// Performs the following steps:<br/>
     ///     1. Authenticates the user and connects to the database<br/>
     ///     2. Prompts the user to input the search string<br/>
-    ///     3. Executes the Search() procedure on the database, retrieving the list of all matches<br/>
-    ///        (even partial matches, on AccountName and EmailAddress fields)
+    ///     3. Executes the Search() procedure on the database, retrieving the list of all matches
     /// </summary>
     /// <returns>The list of credentials from the database that match the user's search criteria.</returns>
     internal static List<EncryptedCredential>? SearchCredentials()
@@ -241,11 +240,9 @@ internal partial class Program
         if (database is null)
             return null;
 
-        AnsiConsole.MarkupLine($"""
-            [{ColorPalette.NEUTRAL_LIGHT}]Find credential records in the database whose identifier or email address
-            fields match (exactly or even partially) with the provided search string.[/]
-
-            """);
+        AnsiConsole.Markup($"[{ColorPalette.NEUTRAL}]Tip: [/]");
+        AnsiConsole.Markup($"[{ColorPalette.NEUTRAL_LIGHT}]Find credentials whose identifier contains the provided search string.[/]\n");
+        AnsiConsole.WriteLine();
 
         // Get the search string from user input
         string searchString = PlaintextPrompt<BasicValidator>(
