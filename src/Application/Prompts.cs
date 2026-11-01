@@ -21,9 +21,12 @@ internal partial class Program
         ConsoleHelper.SaveCheckpoint(); // to change the status message later on
         AnsiConsole.MarkupLine($" [{ColorPalette.NEUTRAL}]PENDING[/]\n");
 
+        AnsiConsole.Cursor.Show();
+
         AnsiConsole.Markup($"Insert your [{ColorPalette.SECONDARY} slowblink]master password[/]: ");
         inputPassword = ConsoleHelper.SecretTextInput();
-        AnsiConsole.WriteLine();
+
+        AnsiConsole.Cursor.Hide();
 
         Database? database;
         bool isCorrectPassword;
@@ -67,6 +70,7 @@ internal partial class Program
             [{ColorPalette.NEUTRAL}]Press[/] [{ColorPalette.NEUTRAL_LIGHT} slowblink]Enter[/] [{ColorPalette.NEUTRAL}]to continue...[/]
             """);
 
+        AnsiConsole.Cursor.Hide();
         ConsoleHelper.WaitForEnterKey();
     }
 
@@ -84,7 +88,7 @@ internal partial class Program
     internal static string PlaintextPrompt<TValidator>(TextPrompt<string> prompt, ValidationContext context = default)
         where TValidator : IValidator<string>
     {
-        // Store the row number before the prompt
+        // Store the cursor position before showing the prompt
         (int column, int row) = Console.GetCursorPosition();
 
         // Disable built-in prompt validation
@@ -97,7 +101,13 @@ internal partial class Program
 
         while (true)
         {
+            AnsiConsole.Cursor.Show();
+
+            // Show Spectre.Console prompt to get user input
             string input = AnsiConsole.Prompt(prompt);
+
+            AnsiConsole.Cursor.Hide();
+
             if (string.IsNullOrEmpty(input) && prompt.AllowEmpty)
                 return input;
 
@@ -108,13 +118,14 @@ internal partial class Program
                 // for the existing prompt, so that the user can edit in-place
                 AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}]{result.Message ?? string.Empty}[/]");
                 prompt.DefaultValue(input);
-                Console.SetCursorPosition(column, row); // the updated prompt will cover the existing text perfectly
+
+                // NOTE: ANSI cursor positions are 1-based
+                AnsiConsole.Cursor.SetPosition(column+1, row+1); // the new prompt will cover the previous one perfectly
             }
             else
             {
-                Console.SetCursorPosition(0, row + 1);
-                AnsiConsole.Write(new string(' ', Console.BufferWidth));  // clear error line
-                Console.SetCursorPosition(0, row + 1);
+                // NOTE: the cursor is already at the left-most position
+                ConsoleHelper.EraseInLine(ConsoleHelper.EraseLineMode.EntireLine);  // clear error line
                 return input;
             }
         }
@@ -135,34 +146,43 @@ internal partial class Program
         string title, SecretString? editableValue = null, ValidationContext context = default)
         where TValidator : IValidator<SecretString>
     {
-        // Store the row number before the prompt
+        // Write prompt title
+        AnsiConsole.Markup(title);
+        AnsiConsole.Write(' ');
+
+        // Store the cursor position before user input
         (int column, int row) = Console.GetCursorPosition();
 
         while (true)
         {
-            // Write prompt title
-            AnsiConsole.Markup(title);
-            AnsiConsole.Write(' ');
+            AnsiConsole.Cursor.Show();
 
             // Get secret user input
             SecretString input = ConsoleHelper.SecretTextInput(editableValue);
             editableValue?.Zeroise();
+
+            AnsiConsole.Cursor.Hide();
+
+            // Position the cursor at the beginning of the next line
+            // NOTE: ANSI cursor positions are 1-based
+            AnsiConsole.Cursor.MoveDown();
+            AnsiConsole.Cursor.MoveLeft(Console.GetCursorPosition().Left);
 
             ValidationResult result = TValidator.Validate(input, context);
             if (!result.Successful)
             {
                 // Print error message and set the current input as the default value
                 // for the existing prompt, so that the user can edit in-place
-                Console.SetCursorPosition(0, row + 1);
                 AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}]{result.Message ?? string.Empty}[/]");
                 editableValue = input;
-                Console.SetCursorPosition(column, row); // the updated prompt will cover the existing text perfectly
+
+                // NOTE: ANSI cursor positions are 1-based
+                AnsiConsole.Cursor.SetPosition(column+1, row+1); // the new prompt will cover the previous one perfectly
             }
             else
             {
-                Console.SetCursorPosition(0, row + 1);
-                AnsiConsole.Write(new string(' ', Console.BufferWidth));  // clear error line
-                Console.SetCursorPosition(0, row + 1);
+                // NOTE: the cursor is already at the left-most position
+                ConsoleHelper.EraseInLine(ConsoleHelper.EraseLineMode.EntireLine);  // clear error line
                 return input;
             }
         }

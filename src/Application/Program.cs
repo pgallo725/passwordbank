@@ -30,6 +30,9 @@ internal partial class Program
     {
         ConsoleHelper.SaveCheckpoint();
 
+        if (AnsiConsole.Profile.Capabilities.Ansi == false)
+            throw new ApplicationException("PasswordBank requires an ANSI-capable console, and the current one isn't.");
+
         // Application title
         Console.Title = $"PasswordBank v{VersionNumber}";
         AnsiConsole.Write(new Panel($"""
@@ -49,7 +52,8 @@ internal partial class Program
             .PadLeft(2)
             .PadRight(2)
         );
-        AnsiConsole.Write('\n');
+        AnsiConsole.Cursor.Hide();
+        AnsiConsole.WriteLine();
 
 
         // Trigger database creation workflow if 'credentials.db' file is not found

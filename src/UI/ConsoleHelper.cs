@@ -1,8 +1,7 @@
 ﻿using PasswordBank.Foundation;
-using Spectre.Console;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Text;
+using Spectre.Console;
 
 namespace PasswordBank.UI
 {
@@ -21,12 +20,16 @@ namespace PasswordBank.UI
                 {
                     initialString.GetData().CopyTo(input);
                     for (length = 0; length < initialString.GetLength(); length++)
-                        Console.Write('*');
+                        AnsiConsole.Write('*');
                 }
-                
+
                 while (true)
                 {
-                    ConsoleKeyInfo keypress = Console.ReadKey(true);
+                    ConsoleKeyInfo? inputkey = AnsiConsole.Console.Input.ReadKey(true);
+                    if (inputkey is null)
+                        continue;
+
+                    ConsoleKeyInfo keypress = inputkey.Value;
                     char keyChar = keypress.KeyChar;
 
                     // Skip unsupported modifiers
@@ -42,9 +45,9 @@ namespace PasswordBank.UI
                     {
                         if (length > 0)
                         {
-                            Console.CursorLeft -= 1;
-                            Console.Write(' ');
-                            Console.CursorLeft -= 1;
+                            AnsiConsole.Cursor.MoveLeft();
+                            AnsiConsole.Write(' ');
+                            AnsiConsole.Cursor.MoveLeft();
                             length--;
                         }
                         continue;
@@ -58,7 +61,7 @@ namespace PasswordBank.UI
                     if (length < MAX_SECRET_LENGTH)
                     {
                         input[length++] = keyChar;
-                        Console.Write('*');
+                        AnsiConsole.Write('*');
                     }
                 }
 
@@ -87,9 +90,37 @@ namespace PasswordBank.UI
         }
 
 
+        // Corresponds to the supported values of 'n' in the "CSI n K" ANSI sequence
+        public enum EraseLineMode
+        {
+            AfterCursor,
+            BeforeCursor,
+            EntireLine
+        }
+        public static void EraseInLine(EraseLineMode mode)
+        {
+            // Does NOT change the cursor position
+            AnsiConsole.Write($"\x1b[{(int)mode}K");
+        }
+
+
+        // Corresponds to the supported values of 'n' in the "CSI n J" ANSI sequence
+        public enum EraseDisplayMode
+        {
+            AfterCursor,
+            BeforeCursor,
+            EntireDisplay
+        }
+        public static void EraseInLine(EraseDisplayMode mode)
+        {
+            // Does NOT change the cursor position
+            AnsiConsole.Write($"\x1b[{(int)mode}J");
+        }
+
+
         private readonly struct ConsolePosition
         {
-            public int Row    { get; init; }
+            public int Row { get; init; }
             public int Column { get; init; }
         }
         private static readonly Stack<ConsolePosition> checkpoints = [];
@@ -108,15 +139,9 @@ namespace PasswordBank.UI
         {
             if (checkpoints.Count > 0)
             {
-                var currentPosition = new ConsolePosition()
-                {
-                    Row = Console.CursorTop,
-                    Column = Console.CursorLeft
-                };
-                var checkpointPosition = checkpoints.Peek();
-
-                ClearRegion(checkpointPosition, currentPosition);
-                Console.SetCursorPosition(checkpointPosition.Column, checkpointPosition.Row);
+                ConsolePosition checkpoint = checkpoints.Peek();
+                AnsiConsole.Cursor.SetPosition(checkpoint.Column + 1, checkpoint.Row + 1);
+                AnsiConsole.Write("\x1b[0J");  // clear the whole screen after the cursor using ANSI codes
             }
         }
 
@@ -124,43 +149,6 @@ namespace PasswordBank.UI
         {
             if (checkpoints.Count > 0)
                 checkpoints.Pop();
-        }
-
-
-        private static void ClearRegion(ConsolePosition start, ConsolePosition end)
-        {
-            int rowCount = end.Row - start.Row + 1;
-            int firstRowLength = Console.BufferWidth - start.Column;
-            int lastRowLength = end.Column;
-
-            // Use a StringBuilder to minimize GC allocations
-            StringBuilder clearStringBuilder = new(rowCount * (Console.BufferWidth + 1));
-
-            // Clear the rest of the first row after start.Column
-            clearStringBuilder.Append(' ', firstRowLength);
-
-            // Clear all full rows between start.Row and end.Row
-            for (int row = 0; row < rowCount - 2; row++)
-            {
-                clearStringBuilder.Append('\n');
-                clearStringBuilder.Append(' ', Console.BufferWidth);
-            }
-
-            // Clear the part of the last row before end.Column
-            if (rowCount > 1)
-            {
-                clearStringBuilder.Append('\n');
-                clearStringBuilder.Append(' ', lastRowLength);
-            }
-
-            // Position the cursor at the start of the clear region
-            Console.SetCursorPosition(start.Column, start.Row);
-
-            // Write the clear string to the console
-            // Instead of calling StringBuilder.ToString(), which allocates new memory,
-            //  we write its chunks directly to the output as ReadOnlySpan<char>
-            foreach (ReadOnlyMemory<char> chunk in clearStringBuilder.GetChunks())
-                Console.Write(chunk.Span);
         }
     }
 }
