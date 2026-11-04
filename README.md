@@ -1,6 +1,14 @@
 # PasswordBank
 
+![GitHub License](https://img.shields.io/github/license/pgallo725/passwordbank?style=flat-square)
+![GitHub Release](https://img.shields.io/github/v/release/pgallo725/passwordbank?style=flat-square)
+![GitHub Release date](https://img.shields.io/github/release-date/pgallo725/passwordbank?style=flat-square)
+![Downloads](https://img.shields.io/github/downloads/pgallo725/passwordbank/total?style=flat-square)
+![Maintained state](https://img.shields.io/maintenance/yes/2026?style=flat-square)
+
 PasswordBank is a lightweight, offline password manager with an easy-to-use console interface. It is built on .NET, using [Spectre.Console](https://github.com/spectreconsole/spectre.console) for the terminal UI and [SQLite3 Multiple Ciphers](https://github.com/utelle/SQLite3MultipleCiphers) for the local encrypted database.
+
+![PasswordBank Preview](./media/demo.gif)
 
 ## Features
 
@@ -15,16 +23,17 @@ PasswordBank is a lightweight, offline password manager with an easy-to-use cons
 ## Supported platforms
 
 *PasswordBank* should run on almost any platform that supports .NET 10:
-- Windows (x86, x64 and ARM64)
-- Linux (x64 and ARM64)
-- macOS (x64 and ARM64)
+- **Windows** (x86, x64 and ARM64)
+- **Linux** (x64 and ARM64)
+- **macOS** (x64 and ARM64)
 
 Additionally, the terminal used to run *PasswordBank* must be **ANSI-capable** and support **alternate screen buffer**.
 Other UI features (such as wide color-palette and Unicode support) can improve the experience but Spectre.Console has fallback implementations for those.
 
-The following terminals have been tested and are guaranteed to work:
-- Windows Terminal (cmd / PowerShell)
-- Git Bash (MSYS2 / Bash)
+The following terminals have been tested and are certified for compatibility:
+- 🖥️ **Windows Terminal** (cmd, PowerShell)
+- 💻 **conhost** (cmd, Powershell)
+- 📟 **mintty** (Cygwin, Git Bash, MSYS2)
 
 ## Installation and setup
 
