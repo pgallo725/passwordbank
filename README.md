@@ -50,6 +50,11 @@ Pre-built binaries are available for all supported Windows architectures on the 
 2. Extract the downloaded archive to your destination folder of choice.
 3. Run the PasswordBank executable from its folder.
 
+> **NOTE:** the downloadable pre-built binaries are not signed with any certificate, therefore *Windows SmartScreen* will warn you when trying to execute them.
+> You can choose to ignore the warning by clicking "More info" and then on the "Run anyways" button.
+>
+> If instead you want to get rid of the warning entirely, build the application yourself using the procedure detailed below for Linux and macOS.
+
 ### Linux and macOS
 
 These operating systems are supported, but pre-built binaries are not available so you should build the project yourself on the target system:
@@ -70,6 +75,8 @@ dotnet publish src/PasswordBank.csproj -p:PublishProfile=<publish-profile>
 # Navigate to build output directory
 cd bin/Publish/<target-platform>
 ```
+
+**NOTE:** replace `<publish-profile>` with the name of one of the **.pubxml* files located in `src/Properties/PublishProfiles` corresponding to your target OS and CPU architecture.
 
 ## Contributions
 
