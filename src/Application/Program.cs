@@ -231,6 +231,7 @@ internal partial class Program
 
             // Clear everything before showing the main menu again
             ConsoleHelper.RestoreCheckpoint();
+            goto ShowMainMenu;
         });
     }
 }
