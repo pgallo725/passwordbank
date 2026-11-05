@@ -348,10 +348,9 @@ internal partial class Program
         EncryptedCredential encryptedCredential = plaintextCredential.Encrypt(keygen, masterPassword);
 
         // Remove secrets from memory immediately
-        masterPassword.Zeroise();
         plaintextCredential.Password.Zeroise();
 
-        if (database.Insert(encryptedCredential))
+        if (database.Insert(masterPassword, encryptedCredential))
             AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Successfully added credential record to the database![/]");
         else AnsiConsole.MarkupLine($"\n[{ColorPalette.ERROR}]Failed to add the credential record to the database![/]");
     }
@@ -424,11 +423,10 @@ internal partial class Program
         EncryptedCredential updatedCredential = plaintextCredential.Encrypt(keygen, masterPassword);
 
         // Remove secrets from memory immediately
-        masterPassword.Zeroise();
         plaintextCredential.Password.Zeroise();
 
         // Update the database and the in-memory record as well
-        if (database.Update(credential, updatedCredential) && credential.Set(updatedCredential))
+        if (database.Update(masterPassword, credential, updatedCredential) && credential.Set(updatedCredential))
             AnsiConsole.MarkupLine($"\n[{ColorPalette.SUCCESS}]Successfully updated credential record![/]");
         else AnsiConsole.MarkupLine($"\n[{ColorPalette.ERROR}]Failed to update the credential record![/]");
     }
@@ -455,13 +453,13 @@ internal partial class Program
                 nameof(credentials));
 
         using Database? database = AuthenticationPrompt(out SecretString inputPassword);
-        inputPassword.Zeroise();  // not used by this method
+        using SecretString masterPassword = inputPassword;
 
         if (database is null)
             return;
 
         // Remove the credential both the database and from the in-memory list
-        if (database.Remove(credential) && (credentials?.Remove(credential) ?? true))
+        if (database.Remove(masterPassword, credential) && (credentials?.Remove(credential) ?? true))
             AnsiConsole.MarkupLine($"[{ColorPalette.SUCCESS}]Successfully removed credential record from the database![/]");
         else AnsiConsole.MarkupLine($"[{ColorPalette.ERROR}]Failed to remove the credential record from the database[/]");
     }

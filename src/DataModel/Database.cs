@@ -538,12 +538,19 @@ namespace PasswordBank.DataModel
         /// <summary>
         /// Insert a new credential into the database.
         /// </summary>
+        /// <param name="password">The database password, to authorize the operation.</param>
         /// <param name="record">The credential record to insert.</param>
         /// <returns>
         /// A boolean value indicating whether the insertion succeeded or not.
         /// </returns>
-        public bool Insert(EncryptedCredential record)
+        public bool Insert(SecretString password, EncryptedCredential record)
         {
+            if (password is null || password.GetLength() == 0)
+                throw new ArgumentException("Value cannot be a null or empty SecretString.", nameof(password));
+
+            if (!VerifyPassword(password))
+                return false;
+
             using var command = connection.CreateCommand();
             command.CommandText = """
                 INSERT INTO Credentials
@@ -563,13 +570,20 @@ namespace PasswordBank.DataModel
         /// <summary>
         /// Update an existing credential record in the database.
         /// </summary>
+        /// <param name="password">The database password, to authorize the operation.</param>
         /// <param name="oldRecord">The old credential record to update.</param>
         /// <param name="newRecord">The updated credential record.</param>
         /// <returns>
         /// A boolean value indicating whether the update succeeded or not.
         /// </returns>
-        public bool Update(EncryptedCredential oldRecord, EncryptedCredential newRecord)
+        public bool Update(SecretString password, EncryptedCredential oldRecord, EncryptedCredential newRecord)
         {
+            if (password is null || password.GetLength() == 0)
+                throw new ArgumentException("Value cannot be a null or empty SecretString.", nameof(password));
+
+            if (!VerifyPassword(password))
+                return false;
+
             using var command = connection.CreateCommand();
             command.CommandText = """
                 UPDATE Credentials
@@ -593,12 +607,19 @@ namespace PasswordBank.DataModel
         /// <summary>
         /// Remove a credential record from the database.
         /// </summary>
+        /// <param name="password">The database password, to authorize the operation.</param>
         /// <param name="record">The credential record to be removed.</param>
         /// <returns>
         /// A boolean value indicating whether the removal succeeded or not.
         /// </returns>
-        public bool Remove(EncryptedCredential record)
+        public bool Remove(SecretString password, EncryptedCredential record)
         {
+            if (password is null || password.GetLength() == 0)
+                throw new ArgumentException("Value cannot be a null or empty SecretString.", nameof(password));
+
+            if (!VerifyPassword(password))
+                return false;
+
             using var command = connection.CreateCommand();
             command.CommandText = """
                 DELETE FROM Credentials
@@ -625,6 +646,10 @@ namespace PasswordBank.DataModel
                 throw new ArgumentException("Value cannot be a null or empty SecretString.", nameof(oldPassword));
             if (newPassword is null || newPassword.GetLength() == 0)
                 throw new ArgumentException("Value cannot be a null or empty SecretString.", nameof(newPassword));
+
+            // Authenticate the user before modifying the database
+            if (!VerifyPassword(oldPassword))
+                return false;
 
             List<EncryptedCredential> credentials = GetCredentials();
 
