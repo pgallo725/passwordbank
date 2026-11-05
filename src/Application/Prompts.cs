@@ -41,6 +41,8 @@ internal partial class Program
         catch (Exception)
         {
             database?.Dispose();  // close the database connection in case of failure
+
+            AnsiConsole.MarkupLine($" [{ColorPalette.ERROR}]FAILED[/]\n");
             return null;
         }
         finally  // ensure this is executed even if the code above throws
