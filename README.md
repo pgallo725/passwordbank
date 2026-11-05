@@ -69,14 +69,22 @@ git clone https://github.com/pgallo725/passwordbank.git
 # Navigate to repository root
 cd passwordbank
 
-# Build the project (see notes below)
-dotnet publish src/PasswordBank.csproj -p:PublishProfile=<publish-profile>
+# Build the project for the target platform
+# The TARGET_PLATFORM name must be in the form of OS-ARCH, e.g. win-x86
+#
+#  ---------------------------------------
+# | OS         | Supported architectures  |
+# |------------|--------------------------|
+# | linux      | x64, arm64               |
+# | osx        | x64, arm64               |
+# | win        | x86, x64, arm64          |
+#  ---------------------------------------
+#
+dotnet publish src/PasswordBank.csproj -p:PublishProfile="TARGET_PLATFORM"
 
 # Navigate to build output directory
-cd bin/Publish/<target-platform>
+cd bin/Publish/<TARGET_PLATFORM>
 ```
-
-**NOTE:** replace `<publish-profile>` with the name of one of the **.pubxml* files located in `src/Properties/PublishProfiles` corresponding to your target OS and CPU architecture.
 
 ## Contributions
 
