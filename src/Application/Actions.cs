@@ -162,6 +162,16 @@ internal partial class Program
         if (database is null)
             return;
 
+        AnsiConsole.MarkupLine($"""
+            [{ColorPalette.NEUTRAL_LIGHT}]Your [{ColorPalette.SECONDARY}]master password[/] [bold]must[/] satisfy these requirements:
+             * Is at least 12 characters long
+             * Contains at least 1 lowercase letter
+             * Contains at least 1 uppercase letter
+             * Contains at least 1 digit character
+             * Contains at least 1 symbol character
+            [/]
+            """);
+
         using SecretString newPassword = SecretPrompt<MasterPasswordValidator>(
             $"Choose your new [{ColorPalette.SECONDARY}]master password[/]:"
             );
