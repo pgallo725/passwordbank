@@ -10,7 +10,7 @@ internal partial class Program
     /// <summary>
     /// The PasswordBank application version number in the <i>Major.Minor.Patch</i> format.
     /// </summary>
-    private static readonly Version VersionNumber = new(1, 1, 0);
+    private static readonly Version VersionNumber = new(1, 1, 1);
 
     /// <summary>
     /// A 'null' EncryptedCredential object to use as cancellation result.
