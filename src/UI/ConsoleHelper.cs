@@ -19,8 +19,12 @@ namespace PasswordBank.UI
                 // If an initial value is provided, copy it into the working buffer
                 if (!SecretString.IsNullOrEmpty(initialString))
                 {
-                    initialString.GetData().CopyTo(input);
-                    for (length = 0; length < initialString.GetLength(); length++)
+                    // Clamp initial string length to MAX_SECRET_LENGTH
+                    int initialStringLength = int.Min(initialString.GetLength(), MAX_SECRET_LENGTH);
+                    ReadOnlySpan<char> initialStringSpan = initialString.GetData()[0..initialStringLength];
+
+                    initialStringSpan.CopyTo(input);
+                    for (length = 0; length < initialStringLength; length++)
                         AnsiConsole.Write('*');
                 }
 
