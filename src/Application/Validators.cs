@@ -134,27 +134,6 @@ namespace PasswordBank.Application
     /// </summary>
     internal class MasterPasswordValidator : IValidator<SecretString>
     {
-        private static readonly SearchValues<char> lowercase = SearchValues.Create
-        (
-            ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-             'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
-        );
-        private static readonly SearchValues<char> uppercase = SearchValues.Create
-        (
-            ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-             'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z']
-        );
-        private static readonly SearchValues<char> digits = SearchValues.Create
-        (
-            ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-        );
-        private static readonly SearchValues<char> symbols = SearchValues.Create
-        (
-            ['!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '+',
-             '/', ':', ';', '<', '=', '>', '?', '\\', '[', '@', ']', '^', '_', '`',
-             '{', '|', '}', '~', '€', '¢', '£',  '¥', '¬', '¦', '—', '°', '¿', 'µ']
-        );
-
         public static ValidationResult Validate(SecretString masterPassword, ValidationContext context)
         {
             /* Check that the master password satisfies the following password strength requirements:
@@ -170,15 +149,36 @@ namespace PasswordBank.Application
                 return ValidationResult.Error("The input length is limited to a maximum of 128 characters.");
             else if (masterPassword.GetLength() < 12)
                 return ValidationResult.Error("The master password must be at least 12 characters long.");
-            else if (!masterPassword.ContainsAny(lowercase))
-                return ValidationResult.Error("The master password must contain at least 1 lowercase letter.");
-            else if (!masterPassword.ContainsAny(uppercase))
-                return ValidationResult.Error("The master password must contain at least 1 uppercase letter.");
-            else if (!masterPassword.ContainsAny(digits))
-                return ValidationResult.Error("The master password must contain at least 1 digit character.");
-            else if (!masterPassword.ContainsAny(symbols))
-                return ValidationResult.Error("The master password must contain at least 1 symbol character.");
-            else return ValidationResult.Success();
+            else
+            {
+                bool hasLowercase = false;
+                bool hasUppercase = false;
+                bool hasDigit = false;
+                bool hasSymbol = false;
+
+                ReadOnlySpan<char> masterPasswordChars = masterPassword.GetData();
+                for (int i = 0; i < masterPassword.GetLength(); i++)
+                {
+                    char ch = masterPasswordChars[i];
+                    if (!hasLowercase && char.IsLower(ch))
+                        hasLowercase = true;
+                    if (!hasUppercase && char.IsUpper(ch))
+                        hasUppercase = true;
+                    if (!hasDigit && char.IsDigit(ch))
+                        hasDigit = true;
+                    if (!hasSymbol && (char.IsSymbol(ch) || char.IsPunctuation(ch)))
+                        hasSymbol = true;
+                }
+                if (!hasLowercase)
+                    return ValidationResult.Error("The master password must contain at least 1 lowercase letter.");
+                else if (!hasUppercase)
+                    return ValidationResult.Error("The master password must contain at least 1 uppercase letter.");
+                else if (!hasDigit)
+                    return ValidationResult.Error("The master password must contain at least 1 digit character.");
+                else if (!hasSymbol)
+                    return ValidationResult.Error("The master password must contain at least 1 symbol character.");
+                else return ValidationResult.Success();
+            }
         }
     }
 }
