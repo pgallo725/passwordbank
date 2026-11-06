@@ -1,4 +1,5 @@
 ﻿using PasswordBank.Foundation;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using Spectre.Console;
@@ -61,11 +62,18 @@ namespace PasswordBank.UI
                         continue;
                     }
 
-                    // Skip non-ASCII or invalid characters
-                    if (keyChar == '\u0000' || !char.IsAscii(keyChar))
+                    // Skip Unicode control characters and surrogate pairs
+                    if (char.IsControl(keyChar) || char.IsSurrogate(keyChar))
                         continue;
 
-                    // Add regular ASCII characters to the string and echo a '*'
+                    // Skip other types of unsupported charachters
+                    UnicodeCategory category = char.GetUnicodeCategory(keyChar);
+                    if (category == UnicodeCategory.Format         || category == UnicodeCategory.PrivateUse         ||
+                        category == UnicodeCategory.LineSeparator  || category == UnicodeCategory.ParagraphSeparator ||
+                        category == UnicodeCategory.NonSpacingMark || category == UnicodeCategory.SpacingCombiningMark)
+                        continue;
+
+                    // Add surviving Unicode characters to the string and echo a '*'
                     if (length < MAX_SECRET_LENGTH)
                     {
                         input[length++] = keyChar;
