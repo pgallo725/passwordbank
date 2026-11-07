@@ -131,7 +131,7 @@ namespace PasswordBank.UI
             BeforeCursor,
             EntireDisplay
         }
-        public static void EraseInLine(EraseDisplayMode mode)
+        public static void EraseInDisplay(EraseDisplayMode mode)
         {
             // Does NOT change the cursor position
             AnsiConsole.Write($"\x1b[{(int)mode}J");

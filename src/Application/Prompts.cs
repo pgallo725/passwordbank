@@ -131,8 +131,10 @@ internal partial class Program
             }
             else
             {
-                // NOTE: the cursor is already at the left-most position
-                ConsoleHelper.EraseInLine(ConsoleHelper.EraseLineMode.EntireLine);  // clear error line
+                // Erase everything after the cursor to remove the previous error message (if any)
+                // NOTE: this does not use EraseInLine because if input was multi-line we don't know
+                //       for sure whether the error message is on the next line or not
+                ConsoleHelper.EraseInDisplay(ConsoleHelper.EraseDisplayMode.AfterCursor);
                 return input;
             }
         }
@@ -188,8 +190,10 @@ internal partial class Program
             }
             else
             {
-                // NOTE: the cursor is already at the left-most position
-                ConsoleHelper.EraseInLine(ConsoleHelper.EraseLineMode.EntireLine);  // clear error line
+                // Erase everything after the cursor to remove the previous error message (if any)
+                // NOTE: this does not use EraseInLine because if input was multi-line we don't know
+                //       for sure whether the error message is on the next line or not
+                ConsoleHelper.EraseInDisplay(ConsoleHelper.EraseDisplayMode.AfterCursor);
                 return input;
             }
         }
