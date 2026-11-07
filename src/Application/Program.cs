@@ -217,14 +217,14 @@ internal partial class Program
             }
             catch (Exception e)
             {
-#if DEBUG   // in Debug mode, print the whole exception trace
-#pragma warning disable IL3050  // WriteException() only used in Debug, no need for AOT compilation
+            #if DEBUG   // in Debug mode, print the whole exception trace
+            #pragma warning disable IL3050  // WriteException() only used in Debug, no need for AOT compilation
                 AnsiConsole.WriteLine();
                 AnsiConsole.WriteException(e, Styles.EXCEPTION);
-#pragma warning restore IL3050
-#elif RELEASE   // in Release mode, print only a short summary of the error
+            #pragma warning restore IL3050
+            #elif RELEASE   // in Release mode, print only a short summary of the error
                 AnsiConsole.MarkupLineInterpolated($"\n[{ColorPalette.ERROR}][[ERROR]] {e.Message}[/]");
-#endif
+            #endif
                 // Wait for confirmation then go reset to the main menu
                 ContinuationPrompt();
             }

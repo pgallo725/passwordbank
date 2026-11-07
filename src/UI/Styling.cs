@@ -30,7 +30,7 @@ namespace PasswordBank.UI
             Decoration = Decoration.None
         };
 
-#if DEBUG
+    #if DEBUG
         /// <summary>
         /// [DEBUG ONLY] Settings for printing exception messages, used throughout the application.
         /// </summary>
@@ -48,6 +48,6 @@ namespace PasswordBank.UI
                 Dimmed        = new Style(ColorPalette.NEUTRAL)
             }
         };
-#endif
+    #endif
     }
 }
