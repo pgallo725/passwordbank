@@ -142,7 +142,7 @@ internal partial class Program
                         // Display the list of credentials and let the user select one
                         EncryptedCredential credential = AnsiConsole.Prompt(
                             new SelectionPrompt<EncryptedCredential>()
-                                .Title($"Select an item to access further options:")
+                                .Title("Select an item to access further options:")
                                 .UseConverter(c => Markup.Escape(c.Name))
                                 .AddChoices(credentials)
                                 .AddChoices(NullCredential)
