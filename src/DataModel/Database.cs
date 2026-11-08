@@ -446,7 +446,8 @@ namespace PasswordBank.DataModel
             using var command = connection.CreateCommand();
             command.CommandText = """
                 SELECT AccountName, EmailAddress, Username, Nonce, Password, AuthTag
-                FROM Credentials;
+                FROM Credentials
+                ORDER BY AccountName COLLATE NOCASE ASC;
                 """;
             using var reader = command.ExecuteReader();
 
