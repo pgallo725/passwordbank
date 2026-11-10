@@ -408,7 +408,7 @@ internal partial class Program
             );
 
         plaintextCredential.EmailAddress = PlaintextPrompt<EmailAddressValidator>(
-            new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Email Address:[/]")
+            new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Email Address:[/] [{ColorPalette.NEUTRAL}](optional)[/]")
                 .DefaultValue(plaintextCredential.EmailAddress ?? string.Empty)
                 .EditableDefaultValue(true)
                 .HideDefaultValue()
@@ -417,7 +417,7 @@ internal partial class Program
             );
 
         plaintextCredential.Username = PlaintextPrompt<BasicValidator>(
-            new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Username:[/]")
+            new TextPrompt<string>($"[{ColorPalette.SECONDARY}] - Username:[/] [{ColorPalette.NEUTRAL}](optional)[/]")
                 .DefaultValue(plaintextCredential.Username ?? string.Empty)
                 .EditableDefaultValue(true)
                 .HideDefaultValue()
