@@ -1,7 +1,6 @@
 ﻿using PasswordBank.DataModel;
 using PasswordBank.Foundation;
 using Spectre.Console;
-using System.Net.Mail;
 
 namespace PasswordBank.Application
 {
@@ -77,7 +76,7 @@ namespace PasswordBank.Application
             // Consider an email address correct if it can be used to construct a valid MailAddress object
             if (emailAddress.Length > 128)
                 return ValidationResult.Error("The input length is limited to a maximum of 128 characters.");
-            else if (MailAddress.TryCreate(emailAddress, out var _))
+            else if (System.Net.Mail.MailAddress.TryCreate(emailAddress, out var _))
                 return ValidationResult.Success();
             else return ValidationResult.Error("The input does not match the format of a valid email address.");
         }
