@@ -107,7 +107,7 @@ internal partial class Program
 
                     CredentialSelectionMenu(credentials,
                         $"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]LIST CREDENTIAL RECORDS[/]",
-                        CompositeFormat.Parse($"[{ColorPalette.NEUTRAL}]Showing [bold]{{0}}[/] credential records.[/]")
+                        CompositeFormat.Parse($"[{ColorPalette.NEUTRAL}]Showing [bold]{{0}}[/] credential record(s).[/]")
                         );
                 } break;
 
@@ -176,8 +176,15 @@ internal partial class Program
             AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]GROUP CREDENTIAL RECORDS (BY EMAIL)[/]");
             AnsiConsole.WriteLine();
 
+            // Count total number of credentials
+            int numCredentials = 0;
+            foreach (var list in groups.Values)
+                numCredentials += list.Count;
+
             // Display the number of distinct email addresses
-            AnsiConsole.MarkupLine($"[{ColorPalette.NEUTRAL}]Found [bold]{groups.Count-1}[/] distinct email address(es).[/]");
+            AnsiConsole.MarkupLine(
+                $"[{ColorPalette.NEUTRAL}]Organized [bold]{numCredentials}[/] credential(s) into [bold]{groups.Count}[/] group(s).[/]"
+                );
 
             // Display the list of email addresses and let the user select one
             string group = AnsiConsole.Prompt(
@@ -186,7 +193,7 @@ internal partial class Program
                     .UseConverter(email => {
                         if (string.IsNullOrEmpty(email))
                             return Markup.Escape(NullCredential.Name);
-                        return $"{Markup.Escape(email)} [{ColorPalette.NEUTRAL}]({groups[email].Count} items)[/]";
+                        return $"{Markup.Escape(email)} [{ColorPalette.NEUTRAL}]({groups[email].Count})[/]";
                     })
                     .AddChoices(groups.Keys)
                     .AddChoices(string.Empty)
@@ -203,7 +210,7 @@ internal partial class Program
                 return;
 
             string title = $"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]LIST CREDENTIAL RECORDS (EMAIL)[/]";
-            var headerFormat = CompositeFormat.Parse($"[{ColorPalette.NEUTRAL}]Showing [bold]{{0}}[/] credentials from group '{group}'.[/]");
+            var headerFormat = CompositeFormat.Parse($"[{ColorPalette.NEUTRAL}]Showing [bold]{{0}}[/] credential(s) from group '{group}'.[/]");
 
             // Show the menu to select a credential record from the list
             CredentialSelectionMenu(groups[group], title, headerFormat);
