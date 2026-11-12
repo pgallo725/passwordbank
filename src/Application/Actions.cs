@@ -10,53 +10,6 @@ namespace PasswordBank;
 internal partial class Program
 {
     /// <summary>
-    /// The possible actions to perform from the PasswordBank main menu.
-    /// </summary>
-    internal enum MainMenuAction
-    {
-        View,
-        Search,
-        Add,
-        ChangePassword,
-        Quit
-    };
-    static string MainMenuActionTextConverter(MainMenuAction action)
-    {
-        return action switch
-        {
-            MainMenuAction.View           => $"[{ColorPalette.PRIMARY}]View[/] the list of all your credentials",
-            MainMenuAction.Search         => $"[{ColorPalette.PRIMARY}]Search[/] for specific records in the database",
-            MainMenuAction.Add            => $"[{ColorPalette.PRIMARY}]Add[/] new credentials to the encrypted database",
-            MainMenuAction.ChangePassword => $"[{ColorPalette.PRIMARY}]Change[/] your master password [{ColorPalette.NEUTRAL}](recommended periodically)[/]",
-            MainMenuAction.Quit           => $"[{ColorPalette.PRIMARY}]Quit[/] the application",
-            _ => throw new ArgumentOutOfRangeException(nameof(action)),
-        };
-    }
-
-    /// <summary>
-    /// The possible actions to perform on a selected credential record.
-    /// </summary>
-    internal enum CredentialAction
-    {
-        View,
-        Edit,
-        Delete,
-        Cancel
-    };
-    static string CredentialActionTextConverter(CredentialAction action)
-    {
-        return action switch
-        {
-            CredentialAction.View   => $"[{ColorPalette.PRIMARY}]View[/] credential details",
-            CredentialAction.Edit   => $"[{ColorPalette.PRIMARY}]Edit[/] the credential information",
-            CredentialAction.Delete => $"[{ColorPalette.PRIMARY}]Delete[/] this record from the database",
-            CredentialAction.Cancel => $"[{ColorPalette.PRIMARY}]Back[/] to the previous menu",
-            _ => throw new ArgumentOutOfRangeException(nameof(action)),
-        };
-    }
-
-
-    /// <summary>
     /// [ACTION] Implements the procedure for creating a credentials database from scratch,<br/>
     /// triggered when the application doesn't detect a database at startup.<br/>
     /// Performs the following steps:<br/>
@@ -262,6 +215,49 @@ internal partial class Program
 
         // Retrieve the list of credentials from the database
         return database.Search(searchString);
+    }
+
+
+    /// <summary>
+    /// [ACTION] Implements gathering and grouping of credential records based on their email address.<br/>
+    /// Performs the following steps:<br/>
+    ///     1. Authenticates the user and connects to the database<br/>
+    ///     2. Loads the list of all credentials from the database (using the GetCredentials() API)<br/>
+    ///     3. Separates credentials into groups based on their email address
+    /// </summary>
+    /// <returns>A dictionary with credentials grouped by their email address, or "No email address".</returns>
+    internal static Dictionary<string, List<EncryptedCredential>>? GroupCredentialsByEmail()
+    {
+        // Action title
+        AnsiConsole.MarkupLine($"""
+            [{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]GROUP CREDENTIAL RECORDS (BY EMAIL)[/]
+            """);
+
+        using Database? database = AuthenticationPrompt(out SecretString inputPassword);
+        inputPassword.Zeroise();  // not used by this method
+
+        if (database is null)
+            return null;
+
+        // Retrieve the list of credentials from the database
+        List<EncryptedCredential> credentials = database.GetCredentials();
+
+        // Group credentials by their email address
+        Dictionary<string, List<EncryptedCredential>> credentialGroups = [];
+
+        foreach (EncryptedCredential credential in credentials)
+        {
+            string key = string.IsNullOrEmpty(credential.EmailAddress)
+                ? "No email address"
+                : credential.EmailAddress;
+
+            ref var group = ref System.Runtime.InteropServices.CollectionsMarshal
+                .GetValueRefOrAddDefault(credentialGroups, key, out _);
+
+            group ??= [];
+            group.Add(credential);
+        }
+        return credentialGroups;
     }
 
 

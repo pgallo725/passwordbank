@@ -1,7 +1,6 @@
 ﻿using PasswordBank.DataModel;
 using PasswordBank.UI;
 using Spectre.Console;
-using System.Diagnostics;
 
 namespace PasswordBank;
 
@@ -11,19 +10,6 @@ internal partial class Program
     /// The PasswordBank application version number in the <i>Major.Minor.Patch</i> format.
     /// </summary>
     private static readonly Version VersionNumber = new(1, 1, 1);
-
-    /// <summary>
-    /// A 'null' EncryptedCredential object to use as cancellation result.
-    /// </summary>
-    private static readonly EncryptedCredential NullCredential = new()
-    {
-        Name = "[BACK TO MAIN MENU]",
-        EmailAddress = null,
-        Username = null,
-        EncryptionNonce = [],
-        EncryptedPassword = [],
-        EncryptionTag = []
-    };
 
 
     static void Main(string[] args)
@@ -81,157 +67,36 @@ internal partial class Program
             }
 
             ConsoleHelper.SaveCheckpoint();
+            bool quit = false;
 
-        ShowMainMenu:
-            try
+            // Main application loop
+            while (!quit)
             {
-                // Show the main menu
-                MainMenuAction mainAction = AnsiConsole.Prompt(
-                    new SelectionPrompt<MainMenuAction>()
-                        .Title($"Select one of the available [{ColorPalette.PRIMARY}]operations[/]:")
-                        .UseConverter(MainMenuActionTextConverter)
-                        .AddChoices(MainMenuAction.View,
-                                    MainMenuAction.Search,
-                                    MainMenuAction.Add,
-                                    MainMenuAction.ChangePassword,
-                                    MainMenuAction.Quit)
-                        .AddCancelResult(MainMenuAction.Quit)
-                        .HighlightStyle(Styles.HIGHLIGHT)
-                );
-                // Clear the main menu before continuing into the selected action
-                ConsoleHelper.RestoreCheckpoint();
-
-                switch (mainAction)
+                try
                 {
-                    case MainMenuAction.View:
-                    case MainMenuAction.Search:
-                    {
-                        // Retrieve the list of relevant passwords from the database (after authentication)
-                        List<EncryptedCredential>? credentials = mainAction switch
-                        {
-                            MainMenuAction.View => ListCredentials(),
-                            MainMenuAction.Search => SearchCredentials(),
-                            _ => throw new UnreachableException()
-                        };
-                        if (credentials is null)  // (authentication failed)
-                        {
-                            ContinuationPrompt();
-                            ConsoleHelper.RestoreCheckpoint();
-                            break;
-                        }
-                        ConsoleHelper.RestoreCheckpoint();
-
-                    ShowCredentialsList:
-                        // Re-print action title
-                        // NOTE: needed because we can get here by navigating back from the credential actions menu
-                        AnsiConsole.MarkupLine(mainAction switch
-                        {
-                            MainMenuAction.View => $"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]LIST CREDENTIAL RECORDS[/]\n",
-                            MainMenuAction.Search => $"[{ColorPalette.NEUTRAL}]>> OPERATION[/] [{ColorPalette.PRIMARY}]SEARCH CREDENTIAL RECORDS[/]\n",
-                            _ => throw new UnreachableException()
-                        });
-
-                        // Display the number of credential records in the list
-                        AnsiConsole.MarkupLine(mainAction switch
-                        {
-                            MainMenuAction.View => $"[{ColorPalette.NEUTRAL}]Showing [bold]{credentials.Count}[/] credential records.[/]",
-                            MainMenuAction.Search => $"[{ColorPalette.NEUTRAL}]Search found [bold]{credentials.Count}[/] relevant result(s).[/]",
-                            _ => throw new UnreachableException()
-                        });
-
-                        // Display the list of credentials and let the user select one
-                        EncryptedCredential credential = AnsiConsole.Prompt(
-                            new SelectionPrompt<EncryptedCredential>()
-                                .Title("Select an item to access further options:")
-                                .UseConverter(c => Markup.Escape(c.Name))
-                                .AddChoices(credentials)
-                                .AddChoices(NullCredential)
-                                .AddCancelResult(NullCredential)
-                                .PageSize(9)
-                                .MoreChoicesText($"[{ColorPalette.NEUTRAL}](Use the UP/DOWN arrow keys to navigate all records)[/]")
-                                .WrapAround(true)
-                                .HighlightStyle(Styles.HIGHLIGHT)
-                        );
-                        // Clear the credentials list before continuing to the next menu
-                        ConsoleHelper.RestoreCheckpoint();
-
-                        if (credential == NullCredential)
-                            goto ShowMainMenu;
-
-                        // Show the menu to choose the action for the selected credential
-                        string selected = Markup.Escape(credential.Name);
-                        CredentialAction credentialAction = AnsiConsole.Prompt(
-                            new SelectionPrompt<CredentialAction>()
-                                .Title($"Select one of the available [{ColorPalette.PRIMARY}]operations[/] for [{ColorPalette.NEUTRAL}]{selected}[/]:")
-                                .UseConverter(CredentialActionTextConverter)
-                                .AddChoices(CredentialAction.View,
-                                            CredentialAction.Edit,
-                                            CredentialAction.Delete,
-                                            CredentialAction.Cancel)
-                                .AddCancelResult(CredentialAction.Cancel)
-                                .HighlightStyle(Styles.HIGHLIGHT)
-                        );
-                        // Clear the menu before continuing into the selected action
-                        ConsoleHelper.RestoreCheckpoint();
-
-                        switch (credentialAction)
-                        {
-                            case CredentialAction.View:
-                                ViewCredential(credential);
-                                ContinuationPrompt();
-                                break;
-
-                            case CredentialAction.Edit:
-                                EditCredential(credential);
-                                ContinuationPrompt();
-                                break;
-
-                            case CredentialAction.Delete:
-                                DeleteCredential(credential, credentials);
-                                ContinuationPrompt();
-                                break;
-
-                            case CredentialAction.Cancel:
-                                /* Nothing to do, show the previous menu */
-                                break;
-                        }
-                        // Clear everything before showing the (updated) list of credentials again
-                        ConsoleHelper.RestoreCheckpoint();
-                        goto ShowCredentialsList;
-                    }
-
-                    case MainMenuAction.Add:
-                        AddCredential();
-                        ContinuationPrompt();
-                        break;
-
-                    case MainMenuAction.ChangePassword:
-                        ChangeMasterPassword();
-                        ContinuationPrompt();
-                        break;
-
-                    case MainMenuAction.Quit:
-                        // NOTHING TO DO
-                        return;
+                    quit = MainMenu();
+                }
+                catch (Exception e)
+                {
+                #if DEBUG   // in Debug mode, print the whole exception trace
+                #pragma warning disable IL3050  // WriteException() only used in Debug, no need for AOT compilation
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.WriteException(e, Styles.EXCEPTION);
+                #pragma warning restore IL3050
+                #elif RELEASE   // in Release mode, print only a short summary of the error
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.MarkupLineInterpolated($"[{ColorPalette.ERROR}][[ERROR]] {e.Message}[/]");
+                #endif
+                    // Wait for confirmation then reset to the main menu
+                    ContinuationPrompt();
+                }
+                finally
+                {
+                    // Clear everything before showing the main menu again
+                    ConsoleHelper.RestoreCheckpoint();
                 }
             }
-            catch (Exception e)
-            {
-            #if DEBUG   // in Debug mode, print the whole exception trace
-            #pragma warning disable IL3050  // WriteException() only used in Debug, no need for AOT compilation
-                AnsiConsole.WriteLine();
-                AnsiConsole.WriteException(e, Styles.EXCEPTION);
-            #pragma warning restore IL3050
-            #elif RELEASE   // in Release mode, print only a short summary of the error
-                AnsiConsole.MarkupLineInterpolated($"\n[{ColorPalette.ERROR}][[ERROR]] {e.Message}[/]");
-            #endif
-                // Wait for confirmation then go reset to the main menu
-                ContinuationPrompt();
-            }
-
-            // Clear everything before showing the main menu again
-            ConsoleHelper.RestoreCheckpoint();
-            goto ShowMainMenu;
+            ConsoleHelper.DeleteCheckpoint();
         });
     }
 }

@@ -160,8 +160,11 @@ namespace PasswordBank.UI
             if (checkpoints.Count > 0)
             {
                 ConsolePosition checkpoint = checkpoints.Peek();
-                AnsiConsole.Cursor.SetPosition(checkpoint.Column + 1, checkpoint.Row + 1);
-                AnsiConsole.Write("\x1b[0J");  // clear the whole screen after the cursor using ANSI codes
+                if (checkpoint.Row != Console.CursorTop || checkpoint.Column != Console.CursorLeft)
+                {
+                    AnsiConsole.Cursor.SetPosition(checkpoint.Column + 1, checkpoint.Row + 1);
+                    AnsiConsole.Write("\x1b[0J");  // clear the whole screen after the cursor using ANSI codes
+                }
             }
         }
 
